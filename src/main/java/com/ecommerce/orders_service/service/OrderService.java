@@ -2,6 +2,7 @@ package com.ecommerce.orders_service.service;
 
 import com.ecommerce.orders_service.dto.OrderItemDto;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.exceptions.OrderNotFoundException;
 import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.repository.OrderRepository;
 import org.springframework.stereotype.Service;
@@ -26,7 +27,7 @@ public class OrderService {
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Order not found with id: " + id));
+                .orElseThrow(() -> new OrderNotFoundException("Pedido no encontrado con id: " + id));
 
         return mapToOrderResponse(order);
     }
