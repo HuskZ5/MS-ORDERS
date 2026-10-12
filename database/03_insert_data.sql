@@ -1,9 +1,239 @@
-USE orders_db;
+-- ============================================================
+-- Rally Java - Ecommerce
+-- Microservicio: Orders
+-- Archivo: 03_insert_data.sql
+-- Descripción:
+--   Datos de prueba para el desarrollo aislado de Orders MS.
+--
+-- IMPORTANTE:
+--   user_id y product_id representan referencias lógicas hacia
+--   Users MS y Products MS respectivamente.
+--
+--   Durante el desarrollo aislado de Orders MS estos valores
+--   son identificadores simulados y no requieren que existan
+--   las tablas de los otros microservicios.
+--
+-- Registros incluidos:
+--   carts       -> 20
+--   cart_items  -> 40
+--   orders      -> 20
+--   order_items -> 40
+-- ============================================================
 
--- Insertar datos de prueba para Carrito
-INSERT INTO carts (user_id) VALUES (1);
-INSERT INTO cart_items (cart_id, product_id, quantity, price) VALUES (1, 101, 2, 250.00);
+USE ecommerce_db;
 
--- Insertar datos de prueba para ordenes
-INSERT INTO orders (user_id, total, status) VALUES (1, 500.00, 'CREATED');
-INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES (1, 101, 2, 250.00);
+
+-- ============================================================
+-- CARTS
+-- 20 registros de prueba
+-- ============================================================
+
+INSERT INTO carts (id, user_id) VALUES
+                                    (1, 1),
+                                    (2, 2),
+                                    (3, 3),
+                                    (4, 4),
+                                    (5, 5),
+                                    (6, 6),
+                                    (7, 7),
+                                    (8, 8),
+                                    (9, 9),
+                                    (10, 10),
+                                    (11, 11),
+                                    (12, 12),
+                                    (13, 13),
+                                    (14, 14),
+                                    (15, 15),
+                                    (16, 16),
+                                    (17, 17),
+                                    (18, 18),
+                                    (19, 19),
+                                    (20, 20);
+
+
+-- ============================================================
+-- CART_ITEMS
+-- 40 registros de prueba
+-- Cada carrito contiene dos productos diferentes.
+--
+-- Se respeta:
+--   quantity > 0
+--   price >= 0
+--   UNIQUE (cart_id, product_id)
+-- ============================================================
+
+INSERT INTO cart_items
+(id, cart_id, product_id, quantity, price)
+VALUES
+    (1,  1,  1,  2,  60.00),
+    (2,  1,  2,  3,  70.00),
+
+    (3,  2,  3,  3,  80.00),
+    (4,  2,  4,  1,  90.00),
+
+    (5,  3,  5,  1, 100.00),
+    (6,  3,  6,  2, 110.00),
+
+    (7,  4,  7,  2, 120.00),
+    (8,  4,  8,  3, 130.00),
+
+    (9,  5,  9,  3, 140.00),
+    (10, 5, 10,  1, 150.00),
+
+    (11, 6, 11,  1, 160.00),
+    (12, 6, 12,  2, 170.00),
+
+    (13, 7, 13,  2, 180.00),
+    (14, 7, 14,  3, 190.00),
+
+    (15, 8, 15,  3, 200.00),
+    (16, 8, 16,  1, 210.00),
+
+    (17, 9, 17,  1, 220.00),
+    (18, 9, 18,  2, 230.00),
+
+    (19, 10, 19, 2, 240.00),
+    (20, 10, 20, 3, 250.00),
+
+    (21, 11, 1,  1,  60.00),
+    (22, 11, 3,  2,  80.00),
+
+    (23, 12, 2,  2,  70.00),
+    (24, 12, 4,  1,  90.00),
+
+    (25, 13, 5,  3, 100.00),
+    (26, 13, 7,  1, 120.00),
+
+    (27, 14, 6,  1, 110.00),
+    (28, 14, 8,  2, 130.00),
+
+    (29, 15, 9,  2, 140.00),
+    (30, 15, 11, 1, 160.00),
+
+    (31, 16, 10, 1, 150.00),
+    (32, 16, 12, 3, 170.00),
+
+    (33, 17, 13, 2, 180.00),
+    (34, 17, 15, 1, 200.00),
+
+    (35, 18, 14, 1, 190.00),
+    (36, 18, 16, 2, 210.00),
+
+    (37, 19, 17, 3, 220.00),
+    (38, 19, 19, 1, 240.00),
+
+    (39, 20, 18, 1, 230.00),
+    (40, 20, 20, 2, 250.00);
+
+
+-- ============================================================
+-- ORDERS
+-- 20 registros de prueba
+--
+-- Estados actualmente definidos por las HU:
+--   CREATED
+--   CANCELLED
+--
+-- El total de cada orden corresponde a:
+--   SUM(quantity * unit_price)
+-- de sus respectivos order_items.
+-- ============================================================
+
+INSERT INTO orders
+(id, user_id, total, status)
+VALUES
+    (1,  1,  330.00,  'CREATED'),
+    (2,  2,  330.00,  'CREATED'),
+    (3,  3,  320.00,  'CANCELLED'),
+    (4,  4,  630.00,  'CREATED'),
+    (5,  5,  570.00,  'CREATED'),
+    (6,  6,  500.00,  'CANCELLED'),
+    (7,  7,  930.00,  'CREATED'),
+    (8,  8,  810.00,  'CREATED'),
+    (9,  9,  680.00,  'CANCELLED'),
+    (10, 10, 1230.00, 'CREATED'),
+    (11, 11, 460.00,  'CREATED'),
+    (12, 12, 430.00,  'CANCELLED'),
+    (13, 13, 730.00,  'CREATED'),
+    (14, 14, 880.00,  'CREATED'),
+    (15, 15, 1010.00, 'CANCELLED'),
+    (16, 16, 1160.00, 'CREATED'),
+    (17, 17, 1290.00, 'CREATED'),
+    (18, 18, 1440.00, 'CANCELLED'),
+    (19, 19, 1570.00, 'CREATED'),
+    (20, 20, 970.00,  'CREATED');
+
+
+-- ============================================================
+-- ORDER_ITEMS
+-- 40 registros de prueba
+-- Cada orden contiene dos productos diferentes.
+--
+-- Se respeta:
+--   quantity > 0
+--   unit_price >= 0
+--   UNIQUE (order_id, product_id)
+-- ============================================================
+
+INSERT INTO order_items
+(id, order_id, product_id, quantity, unit_price)
+VALUES
+    (1,  1,  1,  2,  60.00),
+    (2,  1,  2,  3,  70.00),
+
+    (3,  2,  3,  3,  80.00),
+    (4,  2,  4,  1,  90.00),
+
+    (5,  3,  5,  1, 100.00),
+    (6,  3,  6,  2, 110.00),
+
+    (7,  4,  7,  2, 120.00),
+    (8,  4,  8,  3, 130.00),
+
+    (9,  5,  9,  3, 140.00),
+    (10, 5, 10,  1, 150.00),
+
+    (11, 6, 11,  1, 160.00),
+    (12, 6, 12,  2, 170.00),
+
+    (13, 7, 13,  2, 180.00),
+    (14, 7, 14,  3, 190.00),
+
+    (15, 8, 15,  3, 200.00),
+    (16, 8, 16,  1, 210.00),
+
+    (17, 9, 17,  1, 220.00),
+    (18, 9, 18,  2, 230.00),
+
+    (19, 10, 19, 2, 240.00),
+    (20, 10, 20, 3, 250.00),
+
+    (21, 11, 1,  3,  60.00),
+    (22, 11, 2,  4,  70.00),
+
+    (23, 12, 3,  2,  80.00),
+    (24, 12, 4,  3,  90.00),
+
+    (25, 13, 5,  4, 100.00),
+    (26, 13, 6,  3, 110.00),
+
+    (27, 14, 7,  3, 120.00),
+    (28, 14, 8,  4, 130.00),
+
+    (29, 15, 9,  4, 140.00),
+    (30, 15, 10, 3, 150.00),
+
+    (31, 16, 11, 3, 160.00),
+    (32, 16, 12, 4, 170.00),
+
+    (33, 17, 13, 4, 180.00),
+    (34, 17, 14, 3, 190.00),
+
+    (35, 18, 15, 3, 200.00),
+    (36, 18, 16, 4, 210.00),
+
+    (37, 19, 17, 4, 220.00),
+    (38, 19, 18, 3, 230.00),
+
+    (39, 20, 19, 3, 240.00),
+    (40, 20, 20, 1, 250.00);
