@@ -1,4 +1,4 @@
-package com.ecommerce.orders_service.controller;
+package com.ecommerce.orders_service.controllers;
 
 import com.ecommerce.orders_service.dto.OrderItemDto;
 import com.ecommerce.orders_service.dto.OrderResponse;
