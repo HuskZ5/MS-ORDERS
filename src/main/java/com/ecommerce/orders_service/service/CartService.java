@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class CartService {
@@ -73,23 +74,23 @@ public class CartService {
 
     // Devuelve el carrito de un usuario autenticado
     @Transactional(readOnly = true)
-    public CartResponse getCarByAuthenticatedUser(Long userId){
+    public CartResponse getCarByAuthenticatedUser(Long userId) {
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new CartNotFoundException("No se encontró carrito para el usuario " + userId));
 
-        Cart cart = cartRepository.findByUserId(userId).orElseThrow( () -> new CartNotFoundException("No se encontro carrito para el usuario " + userId));
-        List<CartItemDto> items = cart.getItems().stream()
-                .map(i -> new CartItemDto(i.getId(), i.getProductId(), i.getQuantity(), i.getPrice())).toList();
-        BigDecimal totalAmount = items.stream().map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity()))).reduce(BigDecimal.ZERO, BigDecimal::add);
-        return new CartResponse(cart.getId(), cart.getUserId(), items, totalAmount);
+        return mapToCartResponse(cart);
     }
 
     /**
      * Convierte la entidad Cart a CartResponse DTO.
      */
     public CartResponse mapToCartResponse(Cart cart) {
+        AtomicLong counter = new AtomicLong(1);
         List<CartItemDto> itemDtos = cart.getItems() != null ?
                 cart.getItems().stream()
                         .map(item -> new CartItemDto(
-                                item.getId(),
+                                counter.getAndIncrement(),
+                                /*item.getId(),*/
                                 item.getProductId(),
                                 item.getQuantity(),
                                 item.getPrice()
