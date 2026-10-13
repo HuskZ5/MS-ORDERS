@@ -5,6 +5,7 @@ import com.ecommerce.orders_service.dto.CartItemDto;
 import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.exceptions.CartNotFoundException;
 import com.ecommerce.orders_service.model.Cart;
+import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
 import org.springframework.stereotype.Service;
@@ -18,53 +19,60 @@ import java.util.stream.Collectors;
 @Service
 public class CartService {
 
-    private final OrderRepository orderRepository;
-    // Parte de Miguel ;)
     private final CartRepository cartRepository;
 
-
-    public CartService(OrderRepository orderRepository, CartRepository cartRepository) {
-        this.orderRepository = orderRepository;
+    public CartService(CartRepository cartRepository) {
         this.cartRepository = cartRepository;
     }
 
     /**
-     * HU12 - Obtiene el carrito activo de un usuario por su userId
+     * Obtiene el carrito activo por userId.
      */
     @Transactional(readOnly = true)
     public CartResponse getCartByUserId(Long userId) {
-        // Muestra de respuesta estructurada para conectar con los controllers
-        List<CartItemDto> items = new ArrayList<>();
-        return new CartResponse(1L, userId, items, BigDecimal.ZERO);
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseGet(() -> {
+                    Cart newCart = new Cart();
+                    newCart.setUserId(userId);
+                    newCart.setItems(new ArrayList<>());
+                    return newCart;
+                });
+
+        return mapToCartResponse(cart);
     }
 
     /**
-     * HU11 - Agrega o actualiza la cantidad de un producto en el carrito
+     * Agrega un ítem al carrito.
      */
     @Transactional
     public CartResponse addItemToCart(AddToCartRequest request) {
-        // Calcular el subtotal de la entrada
-        BigDecimal itemSubtotal = request.getPrice().multiply(BigDecimal.valueOf(request.getQuantity()));
+        Cart cart = cartRepository.findByUserId(request.getUserId())
+                .orElseGet(() -> {
+                    Cart newCart = new Cart();
+                    newCart.setUserId(request.getUserId());
+                    newCart.setItems(new ArrayList<>());
+                    return newCart;
+                });
 
-        CartItemDto newItem = new CartItemDto(
-                1L,
-                request.getProductId(),
-                request.getQuantity(),
-                request.getPrice()
-        );
+        if (cart.getItems() == null) {
+            cart.setItems(new ArrayList<>());
+        }
 
-        List<CartItemDto> items = List.of(newItem);
+        CartItem item = new CartItem();
+        item.setCart(cart);
+        item.setProductId(request.getProductId());
+        item.setQuantity(request.getQuantity());
+        item.setPrice(request.getPrice());
 
-        return new CartResponse(
-                1L,
-                request.getUserId(),
-                items,
-                itemSubtotal
-        );
+        cart.getItems().add(item);
+        Cart savedCart = cartRepository.save(cart);
+
+        return mapToCartResponse(savedCart);
     }
 
 
     // Devuelve el carrito de un usuario autenticado
+    @Transactional(readOnly = true)
     public CartResponse getCarByAuthenticatedUser(Long userId){
 
         Cart cart = cartRepository.findByUserId(userId).orElseThrow( () -> new CartNotFoundException("No se encontro carrito para el usuario " + userId));
@@ -75,7 +83,7 @@ public class CartService {
     }
 
     /**
-     * Metodo utilitario para mapear la entidad Cart a CartResponse DTO
+     * Convierte la entidad Cart a CartResponse DTO.
      */
     public CartResponse mapToCartResponse(Cart cart) {
         List<CartItemDto> itemDtos = cart.getItems() != null ?
