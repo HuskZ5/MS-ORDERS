@@ -12,8 +12,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -27,7 +29,11 @@ public class CartService {
     }
 
     /**
-     * Obtiene el carrito activo por userId.
+     * Obtiene el carrito activo asociado al identificador de usuario proporcionado.
+     * Si no se encuentra un carrito persistido para dicho usuario, retorna una representación vacía.
+     *
+     * @param userId Identificador único del usuario.
+     * @return {@link CartResponse} con el estado actual o vacío del carrito.
      */
     @Transactional(readOnly = true)
     public CartResponse getCartByUserId(Long userId) {
@@ -43,7 +49,26 @@ public class CartService {
     }
 
     /**
-     * Agrega un ítem al carrito.
+     * Agrega un ítem al carrito de compras de un usuario según los datos especificados en la solicitud.
+     * <p>
+     * <b>Regla de negocio implementada:</b>
+     * <ul>
+     *   <li>Verifica la existencia del carrito activo del usuario; en caso de no existir, se instancia uno nuevo.</li>
+     *   <li>Inspecciona iterativamente los elementos actuales del carrito ({@code cart.getItems()}) utilizando
+     *       la Stream API para validar si el {@code productId} solicitado ya se encuentra registrado.</li>
+     *   <li><b>Si el producto ya existe:</b> No se crea un nuevo registro. En su lugar, se actualiza la entidad
+     *       existente sumando la nueva cantidad a la cantidad acumulada previa (evitando inserciones duplicadas
+     *       y conflictos de restricciones únicas en base de datos) y se actualiza el precio unitario vigente.</li>
+     *   <li><b>Si el producto no existe:</b> Se instancia un nuevo {@link CartItem}, asociándole el carrito,
+     *       el identificador del producto, la cantidad y el precio, y se añade a la colección de ítems.</li>
+     * </ul>
+     * Finalmente, actualiza la fecha de modificación del carrito, persiste los cambios y retorna la representación
+     * mapeada en {@link CartResponse}.
+     *
+     * @param request DTO {@link AddToCartRequest} con los datos del ítem a agregar, incluyendo el ID del usuario,
+     *                ID del producto, cantidad solicitada y precio unitario.
+     * @return {@link CartResponse} que contiene la información actualizada del carrito, lista de ítems y monto total calculado.
+     * @throws IllegalArgumentException si los datos requeridos en la solicitud son inválidos o nulos.
      */
     @Transactional
     public CartResponse addItemToCart(AddToCartRequest request) {
@@ -52,6 +77,7 @@ public class CartService {
                     Cart newCart = new Cart();
                     newCart.setUserId(request.getUserId());
                     newCart.setItems(new ArrayList<>());
+                    newCart.setCreatedDate(LocalDateTime.now());
                     return newCart;
                 });
 
@@ -59,20 +85,42 @@ public class CartService {
             cart.setItems(new ArrayList<>());
         }
 
-        CartItem item = new CartItem();
-        item.setCart(cart);
-        item.setProductId(request.getProductId());
-        item.setQuantity(request.getQuantity());
-        item.setPrice(request.getPrice());
+        // Buscar si el producto ya existe en el carrito
+        Optional<CartItem> existingItemOpt = cart.getItems().stream()
+                .filter(item -> item.getProductId() != null && item.getProductId().equals(request.getProductId()))
+                .findFirst();
 
-        cart.getItems().add(item);
+        if (existingItemOpt.isPresent()) {
+            CartItem existingItem = existingItemOpt.get();
+            int currentQty = existingItem.getQuantity() != null ? existingItem.getQuantity() : 0;
+            int addedQty = request.getQuantity() != null ? request.getQuantity() : 0;
+            existingItem.setQuantity(currentQty + addedQty);
+            if (request.getPrice() != null) {
+                existingItem.setPrice(request.getPrice());
+            }
+        } else {
+            CartItem newItem = new CartItem();
+            newItem.setCart(cart);
+            newItem.setProductId(request.getProductId());
+            newItem.setQuantity(request.getQuantity());
+            newItem.setPrice(request.getPrice());
+            cart.getItems().add(newItem);
+        }
+
+        cart.setUpdatedDate(LocalDateTime.now());
         Cart savedCart = cartRepository.save(cart);
 
         return mapToCartResponse(savedCart);
     }
 
 
-    // Devuelve el carrito de un usuario autenticado
+    /**
+     * Devuelve el carrito de compras correspondiente a un usuario autenticado.
+     *
+     * @param userId Identificador único del usuario autenticado.
+     * @return {@link CartResponse} con el detalle de ítems y total acumulado.
+     * @throws CartNotFoundException si no existe ningún carrito asociado al identificador proporcionado.
+     */
     @Transactional(readOnly = true)
     public CartResponse getCarByAuthenticatedUser(Long userId) {
         Cart cart = cartRepository.findByUserId(userId)
@@ -82,7 +130,13 @@ public class CartService {
     }
 
     /**
-     * Convierte la entidad Cart a CartResponse DTO.
+     * Convierte la entidad {@link Cart} a su correspondiente DTO de transferencia {@link CartResponse}.
+     * <p>
+     * Transforma la lista de entidades {@link CartItem} a {@link CartItemDto} calculando de manera acumulativa
+     * el monto total del carrito a partir del subtotal de cada ítem (cantidad &times; precio unitario).
+     *
+     * @param cart Entidad de dominio {@link Cart} a transformar.
+     * @return Instancia de {@link CartResponse} con los datos estructurados para la respuesta de la API.
      */
     public CartResponse mapToCartResponse(Cart cart) {
         AtomicLong counter = new AtomicLong(1);
