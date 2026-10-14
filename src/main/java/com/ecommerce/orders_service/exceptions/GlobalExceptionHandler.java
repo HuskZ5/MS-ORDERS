@@ -50,5 +50,10 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<Map<String, String>> handleProductNotFound(ProductNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("error", ex.getMessage()));
+    }
 
 }
