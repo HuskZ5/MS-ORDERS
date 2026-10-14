@@ -11,6 +11,7 @@ import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.model.OrderItem;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
+import com.ecommerce.orders_service.client.ProductClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,10 +26,12 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
+    private final ProductClient productClient;
 
-    public OrderService(OrderRepository orderRepository, CartRepository cartRepository) {
+    public OrderService(OrderRepository orderRepository, CartRepository cartRepository, ProductClient productClient) {
         this.orderRepository = orderRepository;
         this.cartRepository = cartRepository;
+        this.productClient = productClient;
     }
 
     /**
@@ -70,6 +73,9 @@ public class OrderService {
 
         order.setItems(orderItems);
         order.setTotal(totalCalculado);
+        for (CartItem cartItem : cart.getItems()) {
+            productClient.reduceStock(cartItem.getProductId(), cartItem.getQuantity());
+        }
 
         // 5. Guarda la orden y congela los registros
         Order savedOrder = orderRepository.save(order);
