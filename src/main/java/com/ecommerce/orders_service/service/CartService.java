@@ -8,6 +8,8 @@ import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
+import com.ecommerce.orders_service.client.ProductClient;
+import com.ecommerce.orders_service.dto.ProductResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,9 +25,11 @@ import java.util.concurrent.atomic.AtomicLong;
 public class CartService {
 
     private final CartRepository cartRepository;
+    private final ProductClient productClient;
 
-    public CartService(CartRepository cartRepository) {
+    public CartService(CartRepository cartRepository, ProductClient productClient) {
         this.cartRepository = cartRepository;
+        this.productClient = productClient;
     }
 
     /**
@@ -72,6 +76,10 @@ public class CartService {
      */
     @Transactional
     public CartResponse addItemToCart(AddToCartRequest request) {
+        ProductResponse product =
+                productClient.getProductById(request.getProductId());
+        BigDecimal productPrice = product.getPrice();
+
         Cart cart = cartRepository.findByUserId(request.getUserId())
                 .orElseGet(() -> {
                     Cart newCart = new Cart();
@@ -95,15 +103,13 @@ public class CartService {
             int currentQty = existingItem.getQuantity() != null ? existingItem.getQuantity() : 0;
             int addedQty = request.getQuantity() != null ? request.getQuantity() : 0;
             existingItem.setQuantity(currentQty + addedQty);
-            if (request.getPrice() != null) {
-                existingItem.setPrice(request.getPrice());
-            }
+            existingItem.setPrice(productPrice);
         } else {
             CartItem newItem = new CartItem();
             newItem.setCart(cart);
             newItem.setProductId(request.getProductId());
             newItem.setQuantity(request.getQuantity());
-            newItem.setPrice(request.getPrice());
+            newItem.setPrice(productPrice);
             cart.getItems().add(newItem);
         }
 
