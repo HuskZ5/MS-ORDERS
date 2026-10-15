@@ -69,4 +69,28 @@ public class ProductClient {
         }
     }
 
+
+    public void restoreStock(Long productId, Integer quantity) {
+
+        if (productId == null || productId <= 0) {
+            throw new IllegalArgumentException(
+                    "El ID del producto debe ser válido"
+            );
+        }
+
+        if (quantity == null || quantity <= 0) {
+            throw new IllegalArgumentException(
+                    "La cantidad debe ser mayor a cero"
+            );
+        }
+
+        restClient.patch()
+                .uri("/api/products/{id}/stock/restore", productId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(new ReduceStockRequest(quantity))
+                .retrieve()
+                .toBodilessEntity();
+    }
+
+
 }

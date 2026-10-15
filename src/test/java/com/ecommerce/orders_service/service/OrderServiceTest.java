@@ -233,6 +233,8 @@ class OrderServiceTest {
 
         verify(orderRepository, times(1)).findById(orderId);
         verify(orderRepository, times(1)).save(order);
+        verify(productClient, times(1)).restoreStock(101L, 2);
+
     }
 
     /**
@@ -253,6 +255,8 @@ class OrderServiceTest {
 
         assertEquals("Pedido no encontrado con id: 999", exception.getMessage());
         verify(orderRepository, never()).save(any(Order.class));
+        verify(productClient, never()).restoreStock(anyLong(), anyInt());
+
     }
 
     /**
@@ -279,6 +283,7 @@ class OrderServiceTest {
 
         assertEquals("El usuario con id 2 no tiene autorización para cancelar este pedido", exception.getMessage());
         verify(orderRepository, never()).save(any(Order.class));
+        verify(productClient, never()).restoreStock(anyLong(), anyInt());
     }
 
     /**
@@ -304,6 +309,7 @@ class OrderServiceTest {
 
         assertEquals("El pedido con id 1 ya se encuentra cancelado", exception.getMessage());
         verify(orderRepository, never()).save(any(Order.class));
+        verify(productClient, never()).restoreStock(anyLong(), anyInt());
     }
 
     /**
@@ -329,5 +335,48 @@ class OrderServiceTest {
 
         assertEquals("No es posible cancelar el pedido con id 1 porque se encuentra en estado: SHIPPED", exception.getMessage());
         verify(orderRepository, never()).save(any(Order.class));
+        verify(productClient, never()).restoreStock(anyLong(), anyInt());
     }
+
+
+    @Test
+    void shouldNotCancelOrderWhenStockRestorationFails() {
+
+        Long orderId = 1L;
+        Long userId = 1L;
+
+        Order order = new Order(
+                userId,
+                new BigDecimal("250.00"),
+                OrderStatus.CREATED
+        );
+        order.setId(orderId);
+
+        OrderItem item = new OrderItem();
+        item.setProductId(101L);
+        item.setQuantity(2);
+        item.setOrder(order);
+
+        order.setItems(new ArrayList<>(List.of(item)));
+
+        CancelOrderRequest request =
+                new CancelOrderRequest(orderId, userId);
+
+        when(orderRepository.findById(orderId))
+                .thenReturn(Optional.of(order));
+
+        doThrow(new RuntimeException("Error al restaurar stock"))
+                .when(productClient)
+                .restoreStock(101L, 2);
+
+        assertThrows(RuntimeException.class,
+                () -> orderService.cancelOrder(request)
+        );
+
+        assertEquals(OrderStatus.CREATED, order.getStatus());
+
+        verify(orderRepository, never())
+                .save(any(Order.class));
+    }
+
 }
