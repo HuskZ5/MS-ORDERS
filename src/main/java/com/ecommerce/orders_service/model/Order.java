@@ -20,11 +20,15 @@ public class Order {
     @Column(name = "total", nullable = false, precision = 10, scale = 2)
     private BigDecimal total;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status;
+    private OrderStatus status;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
+
+    @Column(name = "cancelled_at")
+    private LocalDateTime cancelledAt;
 
     // Relación 1:N con OrderItem
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -34,13 +38,13 @@ public class Order {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         if (this.status == null) {
-            this.status = "CREATED";
+            this.status = OrderStatus.CREATED;
         }
     }
 
     public Order() {}
 
-    public Order(Long userId, BigDecimal total, String status) {
+    public Order(Long userId, BigDecimal total, OrderStatus status) {
         this.userId = userId;
         this.total = total;
         this.status = status;
@@ -56,11 +60,14 @@ public class Order {
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
 
-    public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
+    public OrderStatus getStatus() { return status; }
+    public void setStatus(OrderStatus status) { this.status = status; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public LocalDateTime getCancelledAt() { return cancelledAt; }
+    public void setCancelledAt(LocalDateTime cancelledAt) { this.cancelledAt = cancelledAt; }
 
     public List<OrderItem> getItems() { return items; }
     public void setItems(List<OrderItem> items) { this.items = items; }
