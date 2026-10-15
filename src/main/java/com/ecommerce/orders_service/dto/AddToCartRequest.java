@@ -1,12 +1,12 @@
 package com.ecommerce.orders_service.dto;
 
-import java.math.BigDecimal;
+//import java.math.BigDecimal;
 
 public class AddToCartRequest {
     private Long userId;
     private Long productId;
     private Integer quantity;
-    private BigDecimal price;
+    //private BigDecimal price;
 
     public AddToCartRequest() {}
 
@@ -20,6 +20,6 @@ public class AddToCartRequest {
     public Integer getQuantity() { return quantity; }
     public void setQuantity(Integer quantity) { this.quantity = quantity; }
 
-    public BigDecimal getPrice() { return price; }
-    public void setPrice(BigDecimal price) { this.price = price; }
+    //public BigDecimal getPrice() { return price; }
+    //public void setPrice(BigDecimal price) { this.price = price; }
 }

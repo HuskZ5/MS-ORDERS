@@ -5,6 +5,8 @@ import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.repository.CartRepository;
+import com.ecommerce.orders_service.client.ProductClient;
+import com.ecommerce.orders_service.dto.ProductResponse;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -32,6 +34,8 @@ class CartServiceTest {
 
     @Mock
     private CartRepository cartRepository;
+    @Mock
+    private ProductClient productClient;
 
     @InjectMocks
     private CartService cartService;
@@ -90,8 +94,10 @@ class CartServiceTest {
         request.setUserId(userId);
         request.setProductId(productId);
         request.setQuantity(3);
-        request.setPrice(new BigDecimal("50.00"));
+        ProductResponse productResponse = new ProductResponse();
+        productResponse.setPrice(new BigDecimal("50.00"));
 
+        when(productClient.getProductById(productId)).thenReturn(productResponse);
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -108,6 +114,7 @@ class CartServiceTest {
 
         verify(cartRepository, times(1)).findByUserId(userId);
         verify(cartRepository, times(1)).save(cart);
+        verify(productClient, times(1)).getProductById(productId);
     }
 
     /**
@@ -138,7 +145,11 @@ class CartServiceTest {
         request.setUserId(userId);
         request.setProductId(newProductId);
         request.setQuantity(1);
-        request.setPrice(new BigDecimal("30.00"));
+        ProductResponse productResponse = new ProductResponse();
+        productResponse.setPrice(new BigDecimal("30.00"));
+
+        when(productClient.getProductById(newProductId))
+                .thenReturn(productResponse);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -169,7 +180,11 @@ class CartServiceTest {
         request.setUserId(userId);
         request.setProductId(productId);
         request.setQuantity(4);
-        request.setPrice(new BigDecimal("25.00"));
+        ProductResponse productResponse = new ProductResponse();
+        productResponse.setPrice(new BigDecimal("25.00"));
+
+        when(productClient.getProductById(productId))
+                .thenReturn(productResponse);
 
         when(cartRepository.findByUserId(userId)).thenReturn(Optional.empty());
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));

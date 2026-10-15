@@ -25,22 +25,28 @@ public class CartController {
     }
 
     @GetMapping("/{userId}")
-    public ResponseEntity<CartResponse> getCart(@PathVariable Long userId) {
-        CartResponse response = cartService.getCarByAuthenticatedUser(userId);
+    public ResponseEntity<CartResponse> getCart(
+            @PathVariable Long userId) {
+
+        CartResponse response =
+                cartService.getCarByAuthenticatedUser(userId);
+
         return ResponseEntity.ok(response);
     }
 
-    // Endpoint para simular el usuario obtenido mediante el header (jwt)
     @GetMapping("/me")
     public ResponseEntity<CartResponse> getCartForAuthenticatedUser(
-            @RequestHeader(value = "X-USER-ID", required = false) Long userId) {
+            @RequestHeader(value = "X-USER-ID", required = false)
+            Long userId) {
 
         if (userId == null) {
-            throw new UnauthorizedUserException("Usuario no autenticado");
+            throw new UnauthorizedUserException(
+                    "Usuario no autenticado");
         }
 
-        CartResponse response = cartService.getCarByAuthenticatedUser(userId);
+        CartResponse response =
+                cartService.getCarByAuthenticatedUser(userId);
+
         return ResponseEntity.ok(response);
     }
-
 }
