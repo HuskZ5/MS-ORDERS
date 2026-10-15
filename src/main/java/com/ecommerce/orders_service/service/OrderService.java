@@ -150,18 +150,27 @@ public class OrderService {
             throw new InvalidOrderStateException("No es posible cancelar el pedido con id " + orderId + " porque se encuentra en estado: " + currentStatus);
         }
 
-        // 4. Cambiar estado a CANCELLED y persistir
+
+        // 4. Devolver al inventario los productos de la orden
+        for (OrderItem item : order.getItems()) {
+            productClient.restoreStock(
+                    item.getProductId(),
+                    item.getQuantity()
+            );
+        }
+
+        // 5. Cambiar estado a CANCELLED y persistir
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancelledAt(LocalDateTime.now());
         Order updatedOrder = orderRepository.save(order);
 
-        // 5. Mapear items devueltos
+        // 6. Mapear items devueltos
         List<ItemReturned> itemsReturned = updatedOrder.getItems() != null ?
                 updatedOrder.getItems().stream()
                         .map(item -> new ItemReturned(item.getProductId(), item.getQuantity()))
                         .collect(Collectors.toList()) : new ArrayList<>();
 
-        // 6. Retornar DTO de cancelación
+        // 7. Retornar DTO de cancelación
         return CancelOrderResponse.builder()
                 .orderId(updatedOrder.getId())
                 .userId(updatedOrder.getUserId())
