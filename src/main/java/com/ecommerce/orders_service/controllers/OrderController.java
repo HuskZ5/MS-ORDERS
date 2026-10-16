@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 /**
  * Controlador REST para gestionar pedidos en el microservicio Orders Service.
  * Expone endpoints para la creación, consulta y cancelación de pedidos.
@@ -21,6 +23,11 @@ public class OrderController {
 
     public OrderController(OrderService orderService) {
         this.orderService = orderService;
+    }
+
+    @GetMapping
+    public ResponseEntity<List<OrderResponse>> getAll(){
+        return ResponseEntity.ok(orderService.getAllOrders());
     }
 
     /**
@@ -73,4 +80,5 @@ public class OrderController {
         CancelOrderResponse response = orderService.cancelOrder(request);
         return ResponseEntity.ok(response);
     }
+
 }
