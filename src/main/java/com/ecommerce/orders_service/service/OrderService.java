@@ -20,6 +20,7 @@ import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.client.ProductClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.GetMapping;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -42,6 +43,22 @@ public class OrderService {
         this.orderRepository = orderRepository;
         this.cartRepository = cartRepository;
         this.productClient = productClient;
+    }
+
+    /**
+     * Obtiene todas las órdenes de compra registradas en el sistema.
+     * Consulta las órdenes mediante el repositorio y convierte cada entidad
+     * Order en un objeto OrderResponse.
+     * Si no existen órdenes disponibles, lanza una excepción.
+     *
+     * @return Lista de {@link OrderResponse} con los datos de las órdenes registradas.
+     * @throws OrderNotFoundException si no existen órdenes disponibles.
+     */
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getAllOrders(){
+        List<Order> orders = orderRepository.findAll();
+        if (orders.isEmpty()) throw new OrderNotFoundException("No hay ordenes disponibles");
+        return orders.stream().map(this::mapToOrderResponse).toList();
     }
 
     /**
