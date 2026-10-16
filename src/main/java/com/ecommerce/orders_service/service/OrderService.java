@@ -55,7 +55,6 @@ public class OrderService {
      * @throws OrderNotFoundException si no existen órdenes disponibles.
      */
     @Transactional(readOnly = true)
-    @GetMapping
     public List<OrderResponse> getAllOrders(){
         List<Order> orders = orderRepository.findAll();
         if (orders.isEmpty()) throw new OrderNotFoundException("No hay ordenes disponibles");
