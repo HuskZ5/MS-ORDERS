@@ -3,11 +3,11 @@ package com.ecommerce.orders_service.service;
 import com.ecommerce.orders_service.dto.AddToCartRequest;
 import com.ecommerce.orders_service.dto.CartItemDto;
 import com.ecommerce.orders_service.dto.CartResponse;
+import com.ecommerce.orders_service.exceptions.BusinessOperationException;
 import com.ecommerce.orders_service.exceptions.CartNotFoundException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.repository.CartRepository;
-import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.ProductResponse;
 import org.springframework.stereotype.Service;
@@ -92,6 +92,9 @@ public class CartService {
         if (cart.getItems() == null) {
             cart.setItems(new ArrayList<>());
         }
+        if (cart.getItems().size() >= 10) {
+            throw new BusinessOperationException("Máximo 10 líneas de productos diferentes");
+        }
 
         // Buscar si el producto ya existe en el carrito
         Optional<CartItem> existingItemOpt = cart.getItems().stream()
@@ -102,15 +105,29 @@ public class CartService {
             CartItem existingItem = existingItemOpt.get();
             int currentQty = existingItem.getQuantity() != null ? existingItem.getQuantity() : 0;
             int addedQty = request.getQuantity() != null ? request.getQuantity() : 0;
+            int newQty = currentQty + addedQty;
+            if (newQty > 5) throw new BusinessOperationException("Máximo 5 unidades por producto");
             existingItem.setQuantity(currentQty + addedQty);
             existingItem.setPrice(productPrice);
         } else {
             CartItem newItem = new CartItem();
             newItem.setCart(cart);
             newItem.setProductId(request.getProductId());
+            if (request.getQuantity() > 5) {
+                throw new BusinessOperationException("Máximo 5 unidades por producto");
+            }
             newItem.setQuantity(request.getQuantity());
             newItem.setPrice(productPrice);
             cart.getItems().add(newItem);
+        }
+        // Calcular el nuevo total
+        BigDecimal newTotal = cart.getItems().stream()
+                .map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // Validar límite de $500
+        if (newTotal.compareTo(new BigDecimal("500")) > 0) {
+            throw new BusinessOperationException("El total del carrito no puede superar $500");
         }
 
         cart.setUpdatedDate(LocalDateTime.now());
