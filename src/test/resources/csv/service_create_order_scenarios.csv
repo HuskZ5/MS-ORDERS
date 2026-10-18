@@ -1,0 +1,5 @@
+description,userId,cartExists,cartEmpty,productId,quantity,unitPrice,expectedTotal,expectedStatus,stockExceptionClass,expectedExceptionClass,expectedErrorMessage
+"Creacion exitosa de orden desde carrito reduce stock y calcula total",5,true,false,101,3,100.00,300.00,CREATED,,,
+"Falla creacion de orden cuando stock es insuficiente",5,true,false,101,5,100.00,0.00,,com.ecommerce.orders_service.exceptions.ProductOutOfStockException,com.ecommerce.orders_service.exceptions.ProductOutOfStockException,"Stock insuficiente para el producto 101"
+"Falla creacion de orden cuando carrito no existe",99,false,true,0,0,0.00,0.00,,,com.ecommerce.orders_service.exceptions.CartNotFoundException,"Carrito no encontrado para el usuario id: 99"
+"Falla creacion de orden cuando carrito esta vacio",5,true,true,0,0,0.00,0.00,,,com.ecommerce.orders_service.exceptions.CartEmptyException,"El carrito del usuario 5 está vacío"

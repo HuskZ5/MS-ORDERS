@@ -1,0 +1,8 @@
+description,orderId,orderExists,initialStatus,orderUserId,requesterUserId,total,productId,quantity,unitPrice,shouldSucceed,expectedStatus,expectedException,expectedErrorMessage
+"Cancelacion exitosa de pedido en estado CREATED calcula reembolso",1,true,CREATED,10,10,250.00,101,2,125.00,true,CANCELLED,,
+"Cancelacion exitosa de pedido en estado CONFIRMED calcula reembolso",2,true,CONFIRMED,10,10,150.00,102,1,150.00,true,CANCELLED,,
+"Falla al intentar cancelar un pedido inexistente",999,false,CREATED,10,10,0.00,0,0,0.00,false,,com.ecommerce.orders_service.exceptions.OrderNotFoundException,"Pedido no encontrado con id: 999"
+"Falla al intentar cancelar con orden ya CANCELLED",1,true,CANCELLED,1,1,100.00,101,1,100.00,false,,com.ecommerce.orders_service.exceptions.InvalidOrderStateException,"El pedido con id 1 ya se encuentra cancelado"
+"Falla al intentar cancelar con orden en estado SHIPPED",1,true,SHIPPED,1,1,100.00,101,1,100.00,false,,com.ecommerce.orders_service.exceptions.InvalidOrderStateException,"No es posible cancelar el pedido con id 1 porque se encuentra en estado: SHIPPED"
+"Falla al intentar cancelar con orden en estado DELIVERED",1,true,DELIVERED,1,1,100.00,101,1,100.00,false,,com.ecommerce.orders_service.exceptions.InvalidOrderStateException,"No es posible cancelar el pedido con id 1 porque se encuentra en estado: DELIVERED"
+"Falla al intentar cancelar por usuario no propietario",1,true,CREATED,1,2,100.00,101,1,100.00,false,,com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException,"El usuario con id 2 no tiene autorización para cancelar este pedido"
