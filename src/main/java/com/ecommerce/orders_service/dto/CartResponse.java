@@ -7,14 +7,19 @@ public class CartResponse {
     private Long cartId;
     private Long userId;
     private List<CartItemDto> items;
+    private BigDecimal subtotal;
+    private BigDecimal discountAmount;
     private BigDecimal totalAmount;
+
 
     public CartResponse() {}
 
-    public CartResponse(Long cartId, Long userId, List<CartItemDto> items, BigDecimal totalAmount) {
+    public CartResponse(Long cartId, Long userId, List<CartItemDto> items, BigDecimal subtotal, BigDecimal discountAmount, BigDecimal totalAmount) {
         this.cartId = cartId;
         this.userId = userId;
         this.items = items;
+        this.subtotal = subtotal;
+        this.discountAmount = discountAmount;
         this.totalAmount = totalAmount;
     }
 
@@ -30,4 +35,10 @@ public class CartResponse {
 
     public BigDecimal getTotalAmount() { return totalAmount; }
     public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
+
+    public BigDecimal getSubtotal() {return subtotal;}
+    public void setSubtotal(BigDecimal subtotal) {this.subtotal = subtotal;}
+
+    public BigDecimal getDiscountAmount() {return discountAmount;}
+    public void setDiscountAmount(BigDecimal discountAmount) {this.discountAmount = discountAmount;}
 }
