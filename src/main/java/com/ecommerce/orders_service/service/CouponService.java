@@ -7,6 +7,8 @@ import com.ecommerce.orders_service.repository.CouponRepository;
 import com.ecommerce.orders_service.repository.CouponUsageRepository;
 import com.ecommerce.orders_service.repository.CartCouponRepository;
 import com.ecommerce.orders_service.model.CartCoupon;
+import com.ecommerce.orders_service.model.CouponUsage;
+import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.exceptions.CartEmptyException;
 import com.ecommerce.orders_service.exceptions.CartNotFoundException;
@@ -158,6 +160,49 @@ public class CouponService {
         return subtotal.subtract(discount);
     }
 
+    @Transactional(readOnly = true)
+    public void validateAppliedCouponsForOrder(
+            Long cartId,
+            Long userId,
+            BigDecimal subtotal
+    ) {
+        List<CartCoupon> appliedCoupons =
+                cartCouponRepository.findByCart_Id(cartId);
+
+        for (CartCoupon cartCoupon : appliedCoupons) {
+            Coupon coupon = cartCoupon.getCoupon();
+
+            validateCoupon(
+                    coupon.getCode(),
+                    userId,
+                    subtotal
+            );
+        }
+    }
+
+    @Transactional
+    public void registerCouponUsages(
+            Long cartId,
+            Order order,
+            Long userId
+    ) {
+        List<CartCoupon> appliedCoupons =
+                cartCouponRepository.findByCart_Id(cartId);
+
+        for (CartCoupon cartCoupon : appliedCoupons) {
+            CouponUsage usage = new CouponUsage();
+
+            usage.setCoupon(cartCoupon.getCoupon());
+            usage.setOrder(order);
+            usage.setUserId(userId);
+            usage.setUsedAt(LocalDateTime.now());
+
+            couponUsageRepository.save(usage);
+        }
+
+        cartCouponRepository.deleteByCart_Id(cartId);
+    }
+
     private void validateDuplicateCoupon(Long cartId, Coupon coupon) {
 
         boolean alreadyApplied =
@@ -195,4 +240,5 @@ public class CouponService {
             );
         }
     }
+
 }
