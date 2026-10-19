@@ -4,8 +4,10 @@ import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.exceptions.InvalidOrderHistoryException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.Order;
+import com.ecommerce.orders_service.model.OrderStatus;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.sources.builders.CartTestDataBuilder;
@@ -18,15 +20,32 @@ import com.ecommerce.orders_service.sources.scenarios.order.GetTodayOrdersScenar
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.ArgumentCaptor;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
+
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Path;
+import jakarta.persistence.criteria.Predicate;
+import jakarta.persistence.criteria.Root;
+
+import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDateTime;
+import java.util.stream.IntStream;
+import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -314,5 +333,179 @@ class OrderServiceTest {
                 verify(orderRepository, never()).save(any(Order.class));
             }
         }
+    }
+
+    @Nested
+    @DisplayName("Historial de pedidos con filtros y paginación")
+    class OrderHistoryTests {
+
+        @Test
+        void shouldGetOrderHistoryWithPagination() {
+
+            Long userId = 1L;
+
+            Order order = OrderTestDataBuilder.anOrder()
+                    .withId(10L)
+                    .withUserId(userId)
+                    .withStatus(OrderStatus.CREATED)
+                    .withTotal("250.00")
+                    .withItem(101L, 2, ("125.00"))
+                    .build();
+
+            Page<Order> orderPage = new PageImpl<>(List.of(order));
+
+            when(orderRepository.findAll(
+                    any(Specification.class),
+                    any(Pageable.class)
+            )).thenReturn(orderPage);
+
+            Page<OrderResponse> response = orderService.getOrderHistory(
+                    userId,
+                    OrderStatus.CREATED,
+                    null,
+                    null,
+                    0,
+                    5
+            );
+
+            assertThat(response.getTotalElements()).isEqualTo(1);
+            assertThat(response.getContent()).hasSize(1);
+            assertThat(response.getContent().get(0).getUserId())
+                    .isEqualTo(userId);
+
+            verify(orderRepository).findAll(
+                    any(Specification.class),
+                    argThat((Pageable pageable) ->
+                            pageable.getPageNumber() == 0
+                                    && pageable.getPageSize() == 5
+                    )
+            );
+        }
+
+        @Test
+        void shouldRejectInvalidDateRange() {
+
+            LocalDate startDate = LocalDate.of(2026, 10, 20);
+            LocalDate endDate = LocalDate.of(2026, 10, 10);
+
+            assertThatThrownBy(() -> orderService.getOrderHistory(
+                    1L,
+                    OrderStatus.CREATED,
+                    startDate,
+                    endDate,
+                    0,
+                    5
+            ))
+                    .isInstanceOf(InvalidOrderHistoryException.class)
+                    .hasMessage("La fecha inicial no puede ser posterior a la final");
+
+            verifyNoInteractions(orderRepository);
+        }
+
+        @Test
+        void shouldRejectPageSizeGreaterThanFive() {
+
+            assertThatThrownBy(() -> orderService.getOrderHistory(
+                    1L,
+                    OrderStatus.CREATED,
+                    null,
+                    null,
+                    0,
+                    10
+            ))
+                    .isInstanceOf(InvalidOrderHistoryException.class)
+                    .hasMessageContaining("el tamaño debe estar entre 1 y 5");
+
+            verifyNoInteractions(orderRepository);
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void shouldCombineOrderHistoryFilters() {
+
+            Long userId = 1L;
+            LocalDate startDate = LocalDate.of(2026, 10, 1);
+            LocalDate endDate = LocalDate.of(2026, 10, 15);
+
+            when(orderRepository.findAll(
+                    any(Specification.class),
+                    any(Pageable.class)
+            )).thenReturn(Page.empty());
+
+            orderService.getOrderHistory(
+                    userId,
+                    OrderStatus.CREATED,
+                    startDate,
+                    endDate,
+                    0,
+                    5
+            );
+
+            ArgumentCaptor<Specification<Order>> captor =
+                    ArgumentCaptor.forClass(Specification.class);
+
+            verify(orderRepository).findAll(
+                    captor.capture(),
+                    any(Pageable.class)
+            );
+
+            Root<Order> root = mock(Root.class);
+            CriteriaQuery<?> query = mock(CriteriaQuery.class);
+            CriteriaBuilder cb = mock(CriteriaBuilder.class);
+
+            Path<Object> userPath = mock(Path.class);
+            Path<Object> statusPath = mock(Path.class);
+            Path<LocalDateTime> datePath = mock(Path.class);
+
+            when(root.get("userId")).thenReturn(userPath);
+            when(root.get("status")).thenReturn(statusPath);
+            when(root.<LocalDateTime>get("createdAt"))
+                    .thenReturn(datePath);
+
+            captor.getValue().toPredicate(root, query, cb);
+
+            verify(cb).equal(userPath, userId);
+            verify(cb).equal(statusPath, OrderStatus.CREATED);
+
+            verify(cb).greaterThanOrEqualTo(
+                    datePath,
+                    startDate.atStartOfDay()
+            );
+
+            verify(cb).lessThan(
+                    datePath,
+                    endDate.plusDays(1).atStartOfDay()
+            );
+        }
+
+        @Test
+        @SuppressWarnings("unchecked")
+        void shouldReturnEmptyHistoryWhenUserHasNoOrders() {
+
+            Long userId = 99L;
+
+            when(orderRepository.findAll(
+                    any(Specification.class),
+                    any(Pageable.class)
+            )).thenReturn(Page.empty());
+
+            Page<OrderResponse> response = orderService.getOrderHistory(
+                    userId,
+                    null,
+                    null,
+                    null,
+                    0,
+                    5
+            );
+
+            assertThat(response).isEmpty();
+            assertThat(response.getTotalElements()).isZero();
+
+            verify(orderRepository).findAll(
+                    any(Specification.class),
+                    any(Pageable.class)
+            );
+        }
+
     }
 }

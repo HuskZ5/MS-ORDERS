@@ -18,8 +18,16 @@ import com.ecommerce.orders_service.model.OrderStatus;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.client.ProductClient;
+import com.ecommerce.orders_service.exceptions.InvalidOrderHistoryException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.ecommerce.orders_service.specification.OrderSpecifications;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.time.LocalDate;
 
@@ -87,7 +95,56 @@ public class OrderService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public Page<OrderResponse> getOrderHistory(
+            Long userId,
+            OrderStatus status,
+            LocalDate startDate,
+            LocalDate endDate,
+            int page,
+            int size) {
 
+        if (userId == null || userId <= 0) {
+            throw new InvalidOrderHistoryException(
+                    "El ID del usuario debe ser válido");
+        }
+
+        if (startDate != null && endDate != null
+                && startDate.isAfter(endDate)) {
+            throw new InvalidOrderHistoryException(
+                    "La fecha inicial no puede ser posterior a la final");
+        }
+
+        if (page < 0 || size < 1 || size > 5) {
+            throw new InvalidOrderHistoryException(
+                    "La página debe ser mayor o igual a 0 y el tamaño debe estar entre 1 y 5");
+        }
+
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by(
+                        Sort.Order.desc("createdAt"),
+                        Sort.Order.desc("id")
+                )
+        );
+
+        Specification<Order> filters =
+                Specification.where(OrderSpecifications.hasUserId(userId))
+                        .and(OrderSpecifications.hasStatus(status))
+                        .and(OrderSpecifications.createdAfter(
+                                startDate != null
+                                        ? startDate.atStartOfDay()
+                                        : null))
+                        .and(OrderSpecifications.createdBefore(
+                                endDate != null
+                                        ? endDate.plusDays(1).atStartOfDay()
+                                        : null));
+
+        Page<Order> orders = orderRepository.findAll(filters, pageable);
+
+        return orders.map(this::mapToOrderResponse);
+    }
 
     /**
      * HU-03: Convierte el carrito activo de un usuario en una orden de compra.

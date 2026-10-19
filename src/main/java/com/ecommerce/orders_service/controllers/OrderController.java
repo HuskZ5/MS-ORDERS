@@ -5,11 +5,15 @@ import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.OrderService;
+import com.ecommerce.orders_service.model.OrderStatus;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 
 import java.util.List;
+import java.time.LocalDate;
 
 /**
  * Controlador REST para gestionar pedidos en el microservicio Orders Service.
@@ -36,8 +40,22 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getTodayOrders());
     }
 
+    @GetMapping("/history")
+    public ResponseEntity<Page<OrderResponse>> getOrderHistory(
+            @RequestParam(required = false) OrderStatus status,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate FI,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            LocalDate FF,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "5") int size) {
 
-
+        throw new UnauthorizedUserException(
+                "El historial requiere autenticación verificada"
+        );
+    }
 
     /**
      * HU-14: Endpoint para obtener los detalles de un pedido por su identificador único.

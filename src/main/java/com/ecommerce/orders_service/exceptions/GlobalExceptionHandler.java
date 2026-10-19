@@ -74,4 +74,12 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidOrderHistoryException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidOrderHistory(
+            InvalidOrderHistoryException ex) {
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
 }
