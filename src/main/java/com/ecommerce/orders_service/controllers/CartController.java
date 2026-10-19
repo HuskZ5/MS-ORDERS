@@ -4,6 +4,8 @@ import com.ecommerce.orders_service.dto.AddToCartRequest;
 import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.CartService;
+import com.ecommerce.orders_service.service.CouponService;
+import com.ecommerce.orders_service.dto.ApplyCouponRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
     private final CartService cartService;
+    private final CouponService couponService;
 
     @PostMapping("/items")
     public ResponseEntity<CartResponse> addProductToCart(
@@ -49,4 +52,18 @@ public class CartController {
 
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{userId}/coupons")
+    public ResponseEntity<CartResponse> applyCoupon(
+            @PathVariable Long userId,
+            @RequestBody ApplyCouponRequest request) {
+
+        couponService.applyCoupon(userId, request.getCode());
+
+        CartResponse response =
+                cartService.getCarByAuthenticatedUser(userId);
+
+        return ResponseEntity.ok(response);
+    }
+
 }
