@@ -43,14 +43,15 @@ public class OrderController {
     }
 
     /**
-     * HU-03: Endpoint para crear una orden a partir de los ítems del carrito activo de un usuario.
-     *
+     * HU-03: Endpoint para crear una orden a partir de los ítems del carrito activo de un usuario con Idempotencia.
      * @param userId Identificador único del usuario dueño del carrito.
-     * @return {@link ResponseEntity} con el {@link OrderResponse} creado y estado HTTP 201 Created.
+     * @return {@link ResponseEntity} con el {@link OrderResponse} creado y estado HTTP 201 Created
      */
     @PostMapping
-    public ResponseEntity<OrderResponse> createOrder(@RequestParam Long userId) {
-        OrderResponse response = orderService.createOrderFromCart(userId);
+    public ResponseEntity<OrderResponse> createOrder(
+            @RequestParam Long userId,
+            @RequestHeader("Idempotency-Key") String idempotencyKey) {
+        OrderResponse response = orderService.createOrder(userId, idempotencyKey);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
 
@@ -80,5 +81,4 @@ public class OrderController {
         CancelOrderResponse response = orderService.cancelOrder(request);
         return ResponseEntity.ok(response);
     }
-
 }

@@ -70,14 +70,14 @@ class OrderServiceTest {
         item1.setId(1L);
         item1.setProductId(1L);
         item1.setQuantity(2);
-        item1.setUnitPrice(new BigDecimal("60.00"));
+        item1.setPrice(new BigDecimal("60.00"));
         item1.setOrder(order);
 
         OrderItem item2 = new OrderItem();
         item2.setId(2L);
         item2.setProductId(2L);
         item2.setQuantity(3);
-        item2.setUnitPrice(new BigDecimal("70.00"));
+        item2.setPrice(new BigDecimal("70.00"));
         item2.setOrder(order);
 
         order.getItems().add(item1);
@@ -147,7 +147,7 @@ class OrderServiceTest {
         when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
-        OrderResponse response = orderService.createOrderFromCart(userId);
+        OrderResponse response = orderService.createOrder(userId);
 
         // Assert
         verify(productClient).reduceStock(101L, 3);
@@ -181,7 +181,7 @@ class OrderServiceTest {
         // Act & Assert
         ProductOutOfStockException exception = assertThrows(
                 ProductOutOfStockException.class,
-                () -> orderService.createOrderFromCart(userId)
+                () -> orderService.createOrder(userId)
         );
 
         assertEquals("Stock insuficiente para el producto 101", exception.getMessage());
@@ -208,7 +208,7 @@ class OrderServiceTest {
         orderItem.setId(10L);
         orderItem.setProductId(101L);
         orderItem.setQuantity(2);
-        orderItem.setUnitPrice(new BigDecimal("125.00"));
+        orderItem.setPrice(new BigDecimal("125.00"));
         orderItem.setOrder(order);
         order.setItems(new ArrayList<>(List.of(orderItem)));
 

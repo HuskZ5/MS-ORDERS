@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 /**
  * Servicio de negocio para gestionar el ciclo de vida de los pedidos.
@@ -69,56 +70,56 @@ public class OrderService {
      * @return {@link OrderResponse} con los datos de la orden creada.
      */
     @Transactional
-    public OrderResponse createOrderFromCart(Long userId) {
-        // 1. Busca el carrito activo del usuario
-        Cart cart = cartRepository.findByUserId(userId)
-                .orElseThrow(() -> new CartNotFoundException("Carrito no encontrado para el usuario id: " + userId));
-
-        // 2. Valida que no este vacio
-        if (cart.getItems() == null || cart.getItems().isEmpty()) {
-            throw new CartEmptyException("El carrito del usuario " + userId + " está vacío");
+    public OrderResponse createOrder(Long userId, String idempotencyKey) {
+        // 1. Validar que la clave de idempotencia no sea nula ni vacía
+        if (idempotencyKey == null || idempotencyKey.trim().isEmpty()) {
+            throw new IllegalArgumentException("El encabezado 'Idempotency-Key' es obligatorio.");
         }
 
-        // 3. Prepara la orden
+        // 2. Regla de negocio: Si la clave ya fue procesada, retornar el pedido existente
+        Optional<Order> existingOrder = orderRepository.findByIdempotencyKey(idempotencyKey);
+        if (existingOrder.isPresent()) {
+            return mapToOrderResponse(existingOrder.get());
+        }
+
+        // 3. Obtener el carrito del usuario
+        Cart cart = cartRepository.findByUserId(userId)
+                .orElseThrow(() -> new CartNotFoundException("No se encontró carrito para el usuario " + userId));
+
+        if (cart.getItems() == null || cart.getItems().isEmpty()) {
+            throw new CartEmptyException("El carrito está vacío.");
+        }
+
+        // 4. Crear la nueva orden
         Order order = new Order();
         order.setUserId(userId);
-        order.setStatus(OrderStatus.CREATED);
-        order.setCreatedAt(LocalDateTime.now());
+        order.setIdempotencyKey(idempotencyKey); // <--- Guardamos la clave
+        order.setStatus(OrderStatus.PENDING); // o CREATED
 
-        // 4. Stop precios y calcula total acumulado
-        List<OrderItem> orderItems = new ArrayList<>();
-        BigDecimal totalCalculado = BigDecimal.ZERO;
-
-        for (CartItem cartItem : cart.getItems()) {
+        // 5. Transferir los ítems del carrito a la orden y calcular el total
+        List<OrderItem> orderItems = cart.getItems().stream().map(cartItem -> {
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProductId(cartItem.getProductId());
             orderItem.setQuantity(cartItem.getQuantity());
-            orderItem.setUnitPrice(cartItem.getPrice());
-
-            BigDecimal subtotal = cartItem.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
-            totalCalculado = totalCalculado.add(subtotal);
-
-            orderItems.add(orderItem);
-        }
-
+            orderItem.setPrice(cartItem.getPrice());
+            return orderItem;
+        }).collect(Collectors.toList());
         order.setItems(orderItems);
-        order.setTotal(totalCalculado);
-        for (CartItem cartItem : cart.getItems()) {
-            productClient.reduceStock(cartItem.getProductId(), cartItem.getQuantity());
-        }
-
-        // 5. Guarda la orden y congela los registros
+        // Calcular total de la orden sumando (precio * cantidad) de los items
+        BigDecimal total = orderItems.stream()
+                .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Asignar el total
+        order.setTotal(total);
+        // 6. Guardar orden
         Order savedOrder = orderRepository.save(order);
-
-        // 6. Vacia el carrito activo
+        // 7. Vaciar el carrito
         cart.getItems().clear();
         cartRepository.save(cart);
 
-        // 7. Retorna el dto
         return mapToOrderResponse(savedOrder);
     }
-
     /**
      * Obtener los detalles de una orden por su ID (HU-14 / GET Order).
      *
@@ -211,7 +212,7 @@ public class OrderService {
                                 item.getId(),
                                 item.getProductId(),
                                 item.getQuantity(),
-                                item.getUnitPrice()
+                                item.getPrice()
                         ))
                         .collect(Collectors.toList()) : new ArrayList<>();
 
