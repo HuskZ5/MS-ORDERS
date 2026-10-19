@@ -1,5 +1,0 @@
-description,orderId,userId,total,status,itemId,productId,quantity,unitPrice,expectedHttpStatus,exceptionClass,expectedErrorMessage
-"Creacion exitosa de orden desde carrito retorna 201 Created",1,5,300.00,CREATED,1,101,3,100.00,201,,
-"Creacion falla cuando carrito no existe y retorna 404 Not Found",,99,,,0,0,0,0.00,404,com.ecommerce.orders_service.exceptions.CartNotFoundException,"Carrito no encontrado para el usuario id: 99"
-"Creacion falla cuando carrito esta vacio y retorna 400 Bad Request",,5,,,0,0,0,0.00,400,com.ecommerce.orders_service.exceptions.CartEmptyException,"El carrito del usuario 5 está vacío"
-"Creacion falla cuando no hay stock suficiente y retorna 409 Conflict",,5,,,0,0,0,0.00,409,com.ecommerce.orders_service.exceptions.ProductOutOfStockException,"Stock insuficiente para el producto 101"

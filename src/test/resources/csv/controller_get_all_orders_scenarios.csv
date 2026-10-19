@@ -1,3 +1,0 @@
-description,orderId,userId,total,status,itemId,productId,quantity,unitPrice,expectedHttpStatus,exceptionClass,expectedErrorMessage
-"Consulta exitosa de todas las ordenes retorna 200 OK",1,1,330.00,CREATED,1,101,2,165.00,200,,
-"Consulta cuando no existen ordenes registradas retorna 404 Not Found",0,0,0.00,CREATED,0,0,0,0.00,404,com.ecommerce.orders_service.exceptions.OrderNotFoundException,"No hay ordenes disponibles"

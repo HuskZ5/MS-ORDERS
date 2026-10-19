@@ -8,22 +8,18 @@ import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
-import com.ecommerce.orders_service.sources.aggregators.CancelOrderScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.CreateOrderScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.GetAllOrdersScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.GetOrderScenarioAggregator;
 import com.ecommerce.orders_service.sources.builders.CartTestDataBuilder;
 import com.ecommerce.orders_service.sources.builders.OrderTestDataBuilder;
-import com.ecommerce.orders_service.sources.scenarios.CancelOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.CreateOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.GetAllOrdersScenario;
-import com.ecommerce.orders_service.sources.scenarios.GetOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.CancelOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.CreateOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.GetAllOrdersScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.GetOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.GetTodayOrdersScenario;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.aggregator.AggregateWith;
-import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -47,8 +43,7 @@ import static org.mockito.Mockito.*;
  *   <li>Estructura jerárquica con {@link Nested} y {@link DisplayName}.</li>
  *   <li>Aserciones fluidas exclusivamente con AssertJ ({@code assertThat}).</li>
  *   <li>Uso de {@link OrderTestDataBuilder} y {@link CartTestDataBuilder}.</li>
- *   <li>Pruebas parametrizadas alimentadas 100% desde archivos CSV mediante {@link CsvFileSource}
- *       e inyectadas directamente como Records mediante {@link AggregateWith}.</li>
+ *   <li>Pruebas parametrizadas alimentadas desde {@code OrderScenarioProvider} mediante {@link MethodSource}.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -64,6 +59,9 @@ class OrderServiceTest {
     @Mock
     private CartRepository cartRepository;
 
+    @Mock
+    private CouponService couponService;
+
     @InjectMocks
     private OrderService orderService;
 
@@ -72,10 +70,9 @@ class OrderServiceTest {
     class GetAllOrdersTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/service_get_all_orders_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de listado general de órdenes desde CSV")
-        void shouldHandleGetAllOrdersScenarios(
-                @AggregateWith(GetAllOrdersScenarioAggregator.class) GetAllOrdersScenario scenario) {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideGetAllOrdersScenarios")
+        @DisplayName("Escenarios de listado general de órdenes")
+        void shouldHandleGetAllOrdersScenarios(GetAllOrdersScenario scenario) {
 
             if (scenario.hasOrders()) {
                 Order order = OrderTestDataBuilder.anOrder()
@@ -113,14 +110,57 @@ class OrderServiceTest {
     }
 
     @Nested
+    @DisplayName("Listado de Pedidos del Día (getTodayOrders)")
+    class GetTodayOrdersTests {
+
+        @ParameterizedTest(name = "{index} - {0}")
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideGetTodayOrdersScenarios")
+        @DisplayName("Escenarios de listado de órdenes del día")
+        void shouldHandleGetTodayOrdersScenarios(GetTodayOrdersScenario scenario) {
+
+            if (scenario.hasOrders()) {
+                Order order = OrderTestDataBuilder.anOrder()
+                        .withId(scenario.orderId())
+                        .withUserId(scenario.userId())
+                        .withTotal(scenario.total())
+                        .withStatus(scenario.status())
+                        .withItem(scenario.productId(), scenario.quantity(), scenario.unitPrice())
+                        .build();
+
+                when(orderRepository.findByCreatedAtBetween(any(), any())).thenReturn(List.of(order));
+
+                List<OrderResponse> responses = orderService.getTodayOrders();
+
+                assertThat(responses)
+                        .isNotNull()
+                        .hasSize(scenario.expectedOrdersCount())
+                        .first()
+                        .satisfies(response -> {
+                            assertThat(response.getId()).isEqualTo(scenario.orderId());
+                            assertThat(response.getUserId()).isEqualTo(scenario.userId());
+                            assertThat(response.getTotal()).isEqualByComparingTo(scenario.total());
+                            assertThat(response.getStatus()).isEqualTo(scenario.status().name());
+                        });
+            } else {
+                when(orderRepository.findByCreatedAtBetween(any(), any())).thenReturn(Collections.emptyList());
+
+                assertThatThrownBy(() -> orderService.getTodayOrders())
+                        .isInstanceOf(scenario.expectedException())
+                        .hasMessage(scenario.expectedErrorMessage());
+            }
+
+            verify(orderRepository).findByCreatedAtBetween(any(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("Consulta de Pedidos (HU-14 / getOrderById)")
     class GetOrderByIdTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/service_get_order_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de consulta de pedido por ID desde CSV")
-        void shouldHandleGetOrderScenarios(
-                @AggregateWith(GetOrderScenarioAggregator.class) GetOrderScenario scenario) {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideGetOrderScenarios")
+        @DisplayName("Escenarios de consulta de pedido por ID")
+        void shouldHandleGetOrderScenarios(GetOrderScenario scenario) {
 
             if (scenario.orderExists()) {
                 Order order = OrderTestDataBuilder.anOrder()
@@ -165,10 +205,9 @@ class OrderServiceTest {
     class CreateOrderTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/service_create_order_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de creación de orden desde carrito vía CSV")
-        void shouldHandleCreateOrderScenarios(
-                @AggregateWith(CreateOrderScenarioAggregator.class) CreateOrderScenario scenario) throws Exception {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideCreateOrderScenarios")
+        @DisplayName("Escenarios de creación de orden desde carrito")
+        void shouldHandleCreateOrderScenarios(CreateOrderScenario scenario) throws Exception {
 
             if (!scenario.cartExists()) {
                 when(cartRepository.findByUserId(scenario.userId())).thenReturn(Optional.empty());
@@ -187,6 +226,7 @@ class OrderServiceTest {
                             .newInstance(scenario.expectedErrorMessage());
                     doThrow(stockEx).when(productClient).reduceStock(scenario.productId(), scenario.quantity());
                 } else if (scenario.expectedExceptionClass() == null) {
+                    when(couponService.calculateFinalTotal(any(), any())).thenAnswer(inv -> inv.getArgument(1));
                     when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
                     when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
                 }
@@ -218,10 +258,9 @@ class OrderServiceTest {
     class CancelOrderTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/cancel_order_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de la máquina de estados cargados desde CSV con Record CancelOrderScenario")
-        void shouldHandleCancelOrderStateMachineScenarios(
-                @AggregateWith(CancelOrderScenarioAggregator.class) CancelOrderScenario scenario) {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideCancelOrderScenarios")
+        @DisplayName("Escenarios de la máquina de estados con Record CancelOrderScenario")
+        void shouldHandleCancelOrderStateMachineScenarios(CancelOrderScenario scenario) {
 
             if (!scenario.orderExists()) {
                 when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.empty());
