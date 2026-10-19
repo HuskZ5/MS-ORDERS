@@ -30,6 +30,15 @@ public class OrderController {
         return ResponseEntity.ok(orderService.getAllOrders());
     }
 
+
+    @GetMapping("/today")
+    public ResponseEntity<List<OrderResponse>> getTodayOrders() {
+        return ResponseEntity.ok(orderService.getTodayOrders());
+    }
+
+
+
+
     /**
      * HU-14: Endpoint para obtener los detalles de un pedido por su identificador único.
      *

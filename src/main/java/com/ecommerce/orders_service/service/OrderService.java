@@ -20,7 +20,10 @@ import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.client.ProductClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
+
+import java.time.LocalDate;
+
+
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -62,6 +65,29 @@ public class OrderService {
         if (orders.isEmpty()) throw new OrderNotFoundException("No hay ordenes disponibles");
         return orders.stream().map(this::mapToOrderResponse).toList();
     }
+
+
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getTodayOrders() {
+
+        LocalDateTime start = LocalDate.now().atStartOfDay();
+        LocalDateTime end = start.plusDays(1);
+
+        List<Order> orders = orderRepository.findByCreatedAtBetween(start, end);
+
+        if (orders.isEmpty()) {
+            throw new OrderNotFoundException(
+                    "No hay órdenes registradas el día de hoy"
+            );
+        }
+
+        return orders.stream()
+                .map(this::mapToOrderResponse)
+                .toList();
+    }
+
+
 
     /**
      * HU-03: Convierte el carrito activo de un usuario en una orden de compra.
