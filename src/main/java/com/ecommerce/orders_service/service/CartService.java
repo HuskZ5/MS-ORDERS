@@ -92,9 +92,6 @@ public class CartService {
         if (cart.getItems() == null) {
             cart.setItems(new ArrayList<>());
         }
-        if (cart.getItems().size() >= 10) {
-            throw new BusinessOperationException("Máximo 10 líneas de productos diferentes");
-        }
 
         // Buscar si el producto ya existe en el carrito
         Optional<CartItem> existingItemOpt = cart.getItems().stream()
@@ -110,6 +107,9 @@ public class CartService {
             existingItem.setQuantity(currentQty + addedQty);
             existingItem.setPrice(productPrice);
         } else {
+            if (cart.getItems().size() >= 10) {
+                throw new BusinessOperationException("Máximo 10 líneas de productos diferentes");
+            }
             CartItem newItem = new CartItem();
             newItem.setCart(cart);
             newItem.setProductId(request.getProductId());
@@ -126,7 +126,7 @@ public class CartService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Validar límite de $500
-        if (newTotal.compareTo(new BigDecimal("500")) > 0) {
+        if (newTotal.compareTo(new BigDecimal("5000")) > 0) {
             throw new BusinessOperationException("El total del carrito no puede superar $500");
         }
 
