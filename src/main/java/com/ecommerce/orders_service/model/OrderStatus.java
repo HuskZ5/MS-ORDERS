@@ -6,6 +6,7 @@ package com.ecommerce.orders_service.model;
 public enum OrderStatus {
     CREATED,
     PENDING,
+    CONFIRMED,
     PAID,
     SHIPPED,
     DELIVERED,

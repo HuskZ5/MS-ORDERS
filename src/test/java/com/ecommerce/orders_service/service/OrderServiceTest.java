@@ -4,41 +4,55 @@ import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
-import com.ecommerce.orders_service.exceptions.InvalidOrderStateException;
-import com.ecommerce.orders_service.exceptions.OrderNotFoundException;
-import com.ecommerce.orders_service.exceptions.ProductOutOfStockException;
-import com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException;
 import com.ecommerce.orders_service.model.Cart;
-import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.model.Order;
-import com.ecommerce.orders_service.model.OrderItem;
-import com.ecommerce.orders_service.model.OrderStatus;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
-import org.junit.jupiter.api.Test;
+import com.ecommerce.orders_service.sources.aggregators.CancelOrderScenarioAggregator;
+import com.ecommerce.orders_service.sources.aggregators.CreateOrderScenarioAggregator;
+import com.ecommerce.orders_service.sources.aggregators.GetAllOrdersScenarioAggregator;
+import com.ecommerce.orders_service.sources.aggregators.GetOrderScenarioAggregator;
+import com.ecommerce.orders_service.sources.builders.CartTestDataBuilder;
+import com.ecommerce.orders_service.sources.builders.OrderTestDataBuilder;
+import com.ecommerce.orders_service.sources.scenarios.CancelOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.CreateOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.GetAllOrdersScenario;
+import com.ecommerce.orders_service.sources.scenarios.GetOrderScenario;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.aggregator.AggregateWith;
+import org.junit.jupiter.params.provider.CsvFileSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.math.BigDecimal;
-import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 /**
- * Pruebas unitarias para la capa de servicio {@link OrderService}.
+ * Suite de pruebas unitarias puras para {@link OrderService}.
  * <p>
- * Valida la lógica de negocio para la consulta, creación y cancelación de pedidos,
- * integrando el enum {@link OrderStatus} y los nuevos DTOs {@link CancelOrderRequest} y {@link CancelOrderResponse}.
+ * Implementa la arquitectura estricta <b>Zero Hardcoded Data</b>:
+ * <ul>
+ *   <li>Estructura jerárquica con {@link Nested} y {@link DisplayName}.</li>
+ *   <li>Aserciones fluidas exclusivamente con AssertJ ({@code assertThat}).</li>
+ *   <li>Uso de {@link OrderTestDataBuilder} y {@link CartTestDataBuilder}.</li>
+ *   <li>Pruebas parametrizadas alimentadas 100% desde archivos CSV mediante {@link CsvFileSource}
+ *       e inyectadas directamente como Records mediante {@link AggregateWith}.</li>
+ * </ul>
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("OrderService - Suite de Pruebas Unitarias (Zero Hardcoded Data)")
 class OrderServiceTest {
 
     @Mock
@@ -53,330 +67,213 @@ class OrderServiceTest {
     @InjectMocks
     private OrderService orderService;
 
-    /**
-     * Valida la consulta exitosa de un pedido por su identificador único cuando el registro existe.
-     */
-    @Test
-    void shouldGetOrderByIdWhenOrderExists() {
-        // Arrange
-        Order order = new Order(
-                1L,
-                new BigDecimal("330.00"),
-                OrderStatus.CREATED
-        );
-        order.setId(1L);
+    @Nested
+    @DisplayName("Listado General de Pedidos (getAllOrders)")
+    class GetAllOrdersTests {
 
-        OrderItem item1 = new OrderItem();
-        item1.setId(1L);
-        item1.setProductId(1L);
-        item1.setQuantity(2);
-        item1.setUnitPrice(new BigDecimal("60.00"));
-        item1.setOrder(order);
+        @ParameterizedTest(name = "{index} - {0}")
+        @CsvFileSource(resources = "/csv/service_get_all_orders_scenarios.csv", numLinesToSkip = 1)
+        @DisplayName("Escenarios de listado general de órdenes desde CSV")
+        void shouldHandleGetAllOrdersScenarios(
+                @AggregateWith(GetAllOrdersScenarioAggregator.class) GetAllOrdersScenario scenario) {
 
-        OrderItem item2 = new OrderItem();
-        item2.setId(2L);
-        item2.setProductId(2L);
-        item2.setQuantity(3);
-        item2.setUnitPrice(new BigDecimal("70.00"));
-        item2.setOrder(order);
+            if (scenario.hasOrders()) {
+                Order order = OrderTestDataBuilder.anOrder()
+                        .withId(scenario.orderId())
+                        .withUserId(scenario.userId())
+                        .withTotal(scenario.total())
+                        .withStatus(scenario.status())
+                        .withItem(scenario.productId(), scenario.quantity(), scenario.unitPrice())
+                        .build();
 
-        order.getItems().add(item1);
-        order.getItems().add(item2);
+                when(orderRepository.findAll()).thenReturn(List.of(order));
 
-        when(orderRepository.findById(1L)).thenReturn(Optional.of(order));
+                List<OrderResponse> responses = orderService.getAllOrders();
 
-        // Act
-        OrderResponse response = orderService.getOrderById(1L);
+                assertThat(responses)
+                        .isNotNull()
+                        .hasSize(scenario.expectedOrdersCount())
+                        .first()
+                        .satisfies(response -> {
+                            assertThat(response.getId()).isEqualTo(scenario.orderId());
+                            assertThat(response.getUserId()).isEqualTo(scenario.userId());
+                            assertThat(response.getTotal()).isEqualByComparingTo(scenario.total());
+                            assertThat(response.getStatus()).isEqualTo(scenario.status().name());
+                        });
+            } else {
+                when(orderRepository.findAll()).thenReturn(Collections.emptyList());
 
-        // Assert
-        assertEquals(1L, response.getId());
-        assertEquals(1L, response.getUserId());
-        assertEquals(new BigDecimal("330.00"), response.getTotal());
-        assertEquals("CREATED", response.getStatus());
-        assertEquals(2, response.getItems().size());
-        assertEquals(1L, response.getItems().get(0).getProductId());
-        assertEquals(2, response.getItems().get(0).getQuantity());
-        assertEquals(new BigDecimal("60.00"), response.getItems().get(0).getUnitPrice());
-        assertEquals(2L, response.getItems().get(1).getProductId());
-        assertEquals(3, response.getItems().get(1).getQuantity());
-        assertEquals(new BigDecimal("70.00"), response.getItems().get(1).getUnitPrice());
+                assertThatThrownBy(() -> orderService.getAllOrders())
+                        .isInstanceOf(scenario.expectedException())
+                        .hasMessage(scenario.expectedErrorMessage());
+            }
+
+            verify(orderRepository).findAll();
+        }
     }
 
-    /**
-     * Valida que se lance {@link OrderNotFoundException} al consultar un pedido inexistente.
-     */
-    @Test
-    void shouldThrowOrderNotFoundExceptionWhenOrderDoesNotExist() {
-        when(orderRepository.findById(999L)).thenReturn(Optional.empty());
+    @Nested
+    @DisplayName("Consulta de Pedidos (HU-14 / getOrderById)")
+    class GetOrderByIdTests {
 
-        OrderNotFoundException exception = assertThrows(
-                OrderNotFoundException.class,
-                () -> orderService.getOrderById(999L)
-        );
+        @ParameterizedTest(name = "{index} - {0}")
+        @CsvFileSource(resources = "/csv/service_get_order_scenarios.csv", numLinesToSkip = 1)
+        @DisplayName("Escenarios de consulta de pedido por ID desde CSV")
+        void shouldHandleGetOrderScenarios(
+                @AggregateWith(GetOrderScenarioAggregator.class) GetOrderScenario scenario) {
 
-        assertEquals("Pedido no encontrado con id: 999", exception.getMessage());
+            if (scenario.orderExists()) {
+                Order order = OrderTestDataBuilder.anOrder()
+                        .withId(scenario.orderId())
+                        .withUserId(scenario.userId())
+                        .withTotal(scenario.total())
+                        .withStatus(scenario.status())
+                        .withItem(scenario.productId(), scenario.quantity(), scenario.unitPrice())
+                        .build();
+
+                when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.of(order));
+
+                OrderResponse response = orderService.getOrderById(scenario.orderId());
+
+                assertThat(response).isNotNull();
+                assertThat(response.getId()).isEqualTo(scenario.orderId());
+                assertThat(response.getUserId()).isEqualTo(scenario.userId());
+                assertThat(response.getTotal()).isEqualByComparingTo(scenario.total());
+                assertThat(response.getStatus()).isEqualTo(scenario.status().name());
+                assertThat(response.getItems())
+                        .hasSize(1)
+                        .first()
+                        .satisfies(item -> {
+                            assertThat(item.getProductId()).isEqualTo(scenario.productId());
+                            assertThat(item.getQuantity()).isEqualTo(scenario.quantity());
+                            assertThat(item.getUnitPrice()).isEqualByComparingTo(scenario.unitPrice());
+                        });
+            } else {
+                when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.empty());
+
+                assertThatThrownBy(() -> orderService.getOrderById(scenario.orderId()))
+                        .isInstanceOf(scenario.expectedException())
+                        .hasMessage(scenario.expectedErrorMessage());
+            }
+
+            verify(orderRepository).findById(scenario.orderId());
+        }
     }
 
-    /**
-     * Valida que al crear una orden desde el carrito, se descuente el inventario de cada producto.
-     */
-    @Test
-    void shouldReduceStockWhenCreatingOrder() {
-        // Arrange
-        Long userId = 5L;
+    @Nested
+    @DisplayName("Creación de Pedidos desde Carrito (HU-03 / createOrderFromCart)")
+    class CreateOrderTests {
 
-        Cart cart = new Cart();
-        cart.setUserId(userId);
+        @ParameterizedTest(name = "{index} - {0}")
+        @CsvFileSource(resources = "/csv/service_create_order_scenarios.csv", numLinesToSkip = 1)
+        @DisplayName("Escenarios de creación de orden desde carrito vía CSV")
+        void shouldHandleCreateOrderScenarios(
+                @AggregateWith(CreateOrderScenarioAggregator.class) CreateOrderScenario scenario) throws Exception {
 
-        CartItem item1 = new CartItem();
-        item1.setProductId(101L);
-        item1.setQuantity(3);
-        item1.setPrice(new BigDecimal("100.00"));
-        item1.setCart(cart);
+            if (!scenario.cartExists()) {
+                when(cartRepository.findByUserId(scenario.userId())).thenReturn(Optional.empty());
+            } else {
+                CartTestDataBuilder cartBuilder = CartTestDataBuilder.aCart()
+                        .withUserId(scenario.userId());
+                if (!scenario.cartEmpty()) {
+                    cartBuilder.withItem(scenario.productId(), scenario.quantity(), scenario.unitPrice());
+                }
+                Cart cart = cartBuilder.build();
+                when(cartRepository.findByUserId(scenario.userId())).thenReturn(Optional.of(cart));
 
-        CartItem item2 = new CartItem();
-        item2.setProductId(102L);
-        item2.setQuantity(2);
-        item2.setPrice(new BigDecimal("200.00"));
-        item2.setCart(cart);
+                if (scenario.stockExceptionClass() != null) {
+                    Throwable stockEx = scenario.stockExceptionClass()
+                            .getDeclaredConstructor(String.class)
+                            .newInstance(scenario.expectedErrorMessage());
+                    doThrow(stockEx).when(productClient).reduceStock(scenario.productId(), scenario.quantity());
+                } else if (scenario.expectedExceptionClass() == null) {
+                    when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+                    when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
+                }
+            }
 
-        cart.setItems(new ArrayList<>(List.of(item1, item2)));
+            if (scenario.expectedExceptionClass() != null) {
+                assertThatThrownBy(() -> orderService.createOrderFromCart(scenario.userId()))
+                        .isInstanceOf(scenario.expectedExceptionClass())
+                        .hasMessage(scenario.expectedErrorMessage());
 
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-        when(cartRepository.save(any(Cart.class))).thenAnswer(invocation -> invocation.getArgument(0));
+                verify(orderRepository, never()).save(any(Order.class));
+                verify(cartRepository, never()).save(any(Cart.class));
+            } else {
+                OrderResponse response = orderService.createOrderFromCart(scenario.userId());
 
-        // Act
-        OrderResponse response = orderService.createOrderFromCart(userId);
-
-        // Assert
-        verify(productClient).reduceStock(101L, 3);
-        verify(productClient).reduceStock(102L, 2);
-        assertEquals(new BigDecimal("700.00"), response.getTotal());
+                assertThat(response).isNotNull();
+                assertThat(response.getUserId()).isEqualTo(scenario.userId());
+                assertThat(response.getTotal()).isEqualByComparingTo(scenario.expectedTotal());
+                assertThat(response.getStatus()).isEqualTo(scenario.expectedStatus().name());
+                verify(productClient).reduceStock(scenario.productId(), scenario.quantity());
+                verify(orderRepository).save(any(Order.class));
+                verify(cartRepository).save(any(Cart.class));
+            }
+        }
     }
 
-    /**
-     * Valida que no se persista la orden si el stock de algún producto es insuficiente.
-     */
-    @Test
-    void shouldNotCreateOrderWhenStockIsInsufficient() {
-        // Arrange
-        Long userId = 5L;
+    @Nested
+    @DisplayName("Cancelación de Pedidos (HU-15 / cancelOrder)")
+    class CancelOrderTests {
 
-        Cart cart = new Cart();
-        cart.setUserId(userId);
+        @ParameterizedTest(name = "{index} - {0}")
+        @CsvFileSource(resources = "/csv/cancel_order_scenarios.csv", numLinesToSkip = 1)
+        @DisplayName("Escenarios de la máquina de estados cargados desde CSV con Record CancelOrderScenario")
+        void shouldHandleCancelOrderStateMachineScenarios(
+                @AggregateWith(CancelOrderScenarioAggregator.class) CancelOrderScenario scenario) {
 
-        CartItem item = new CartItem();
-        item.setProductId(101L);
-        item.setQuantity(5);
-        item.setPrice(new BigDecimal("100.00"));
-        item.setCart(cart);
+            if (!scenario.orderExists()) {
+                when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.empty());
+            } else {
+                Order order = OrderTestDataBuilder.anOrder()
+                        .withId(scenario.orderId())
+                        .withUserId(scenario.orderUserId())
+                        .withStatus(scenario.initialStatus())
+                        .withTotal(scenario.total())
+                        .withItem(scenario.productId(), scenario.quantity(), scenario.unitPrice())
+                        .build();
 
-        cart.setItems(new ArrayList<>(List.of(item)));
+                when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.of(order));
+                if (scenario.shouldSucceed()) {
+                    when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+                }
+            }
 
-        when(cartRepository.findByUserId(userId)).thenReturn(Optional.of(cart));
-        doThrow(new ProductOutOfStockException("Stock insuficiente para el producto 101"))
-                .when(productClient).reduceStock(101L, 5);
+            CancelOrderRequest request = OrderTestDataBuilder.buildCancelOrderRequest(scenario);
 
-        // Act & Assert
-        ProductOutOfStockException exception = assertThrows(
-                ProductOutOfStockException.class,
-                () -> orderService.createOrderFromCart(userId)
-        );
+            if (scenario.shouldSucceed()) {
+                CancelOrderResponse response = orderService.cancelOrder(request);
 
-        assertEquals("Stock insuficiente para el producto 101", exception.getMessage());
-        verify(orderRepository, never()).save(any(Order.class));
-        verify(cartRepository, never()).save(any(Cart.class));
-        assertEquals(1, cart.getItems().size());
-        assertEquals(5, cart.getItems().get(0).getQuantity());
+                assertThat(response)
+                        .isNotNull()
+                        .extracting(
+                                CancelOrderResponse::getOrderId,
+                                CancelOrderResponse::getUserId,
+                                CancelOrderResponse::getEstatus
+                        )
+                        .containsExactly(scenario.orderId(), scenario.orderUserId(), scenario.expectedStatus());
+
+                assertThat(response.getRefundAmount()).isEqualByComparingTo(scenario.total());
+                assertThat(response.getCancelledAt()).isNotNull();
+                assertThat(response.getItemsReturned())
+                        .hasSize(1)
+                        .first()
+                        .satisfies(item -> {
+                            assertThat(item.getProductId()).isEqualTo(scenario.productId());
+                            assertThat(item.getQuantity()).isEqualTo(scenario.quantity());
+                        });
+
+                verify(productClient).restoreStock(scenario.productId(), scenario.quantity());
+                verify(orderRepository).save(any(Order.class));
+            } else {
+                assertThatThrownBy(() -> orderService.cancelOrder(request))
+                        .isInstanceOf(scenario.expectedException())
+                        .hasMessage(scenario.expectedErrorMessage());
+
+                verify(productClient, never()).restoreStock(anyLong(), anyInt());
+                verify(orderRepository, never()).save(any(Order.class));
+            }
+        }
     }
-
-    /**
-     * HU-15: Valida la cancelación exitosa de un pedido cuando el usuario es dueño y el estado es CREATED.
-     * Retorna CancelOrderResponse con estatus CANCELLED, items devueltos y refundAmount.
-     */
-    @Test
-    void shouldCancelOrderSuccessfullyWhenStatusIsCreatedAndUserIsOwner() {
-        // Arrange
-        Long orderId = 1L;
-        Long userId = 1L;
-
-        Order order = new Order(userId, new BigDecimal("250.00"), OrderStatus.CREATED);
-        order.setId(orderId);
-
-        OrderItem orderItem = new OrderItem();
-        orderItem.setId(10L);
-        orderItem.setProductId(101L);
-        orderItem.setQuantity(2);
-        orderItem.setUnitPrice(new BigDecimal("125.00"));
-        orderItem.setOrder(order);
-        order.setItems(new ArrayList<>(List.of(orderItem)));
-
-        CancelOrderRequest request = new CancelOrderRequest(orderId, userId);
-
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-        when(orderRepository.save(any(Order.class))).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        CancelOrderResponse response = orderService.cancelOrder(request);
-
-        // Assert
-        assertNotNull(response);
-        assertEquals(orderId, response.getOrderId());
-        assertEquals(userId, response.getUserId());
-        assertEquals(OrderStatus.CANCELLED, response.getEstatus());
-        assertEquals(new BigDecimal("250.00"), response.getRefundAmount());
-        assertNotNull(response.getCancelledAt());
-        assertEquals(1, response.getItemsReturned().size());
-        assertEquals(101L, response.getItemsReturned().get(0).getProductId());
-        assertEquals(2, response.getItemsReturned().get(0).getQuantity());
-
-        verify(orderRepository, times(1)).findById(orderId);
-        verify(orderRepository, times(1)).save(order);
-        verify(productClient, times(1)).restoreStock(101L, 2);
-
-    }
-
-    /**
-     * HU-15: Valida que se lance {@link OrderNotFoundException} si el pedido a cancelar no existe.
-     */
-    @Test
-    void shouldThrowOrderNotFoundExceptionWhenOrderDoesNotExistOnCancel() {
-        Long orderId = 999L;
-        Long userId = 1L;
-        CancelOrderRequest request = new CancelOrderRequest(orderId, userId);
-
-        when(orderRepository.findById(orderId)).thenReturn(Optional.empty());
-
-        OrderNotFoundException exception = assertThrows(
-                OrderNotFoundException.class,
-                () -> orderService.cancelOrder(request)
-        );
-
-        assertEquals("Pedido no encontrado con id: 999", exception.getMessage());
-        verify(orderRepository, never()).save(any(Order.class));
-        verify(productClient, never()).restoreStock(anyLong(), anyInt());
-
-    }
-
-    /**
-     * HU-15: Valida que se lance {@link UnauthorizedOrderAccessException} si el usuario que solicita
-     * la cancelación no es el dueño del pedido.
-     */
-    @Test
-    void shouldThrowUnauthorizedOrderAccessExceptionWhenUserIsNotOwnerOnCancel() {
-        Long orderId = 1L;
-        Long ownerUserId = 1L;
-        Long intruderUserId = 2L;
-
-        Order order = new Order(ownerUserId, new BigDecimal("100.00"), OrderStatus.CREATED);
-        order.setId(orderId);
-
-        CancelOrderRequest request = new CancelOrderRequest(orderId, intruderUserId);
-
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-
-        UnauthorizedOrderAccessException exception = assertThrows(
-                UnauthorizedOrderAccessException.class,
-                () -> orderService.cancelOrder(request)
-        );
-
-        assertEquals("El usuario con id 2 no tiene autorización para cancelar este pedido", exception.getMessage());
-        verify(orderRepository, never()).save(any(Order.class));
-        verify(productClient, never()).restoreStock(anyLong(), anyInt());
-    }
-
-    /**
-     * HU-15: Valida que se lance {@link InvalidOrderStateException} si se intenta cancelar un pedido
-     * que ya se encuentra en estado CANCELLED.
-     */
-    @Test
-    void shouldThrowInvalidOrderStateExceptionWhenOrderIsAlreadyCancelled() {
-        Long orderId = 1L;
-        Long userId = 1L;
-
-        Order order = new Order(userId, new BigDecimal("100.00"), OrderStatus.CANCELLED);
-        order.setId(orderId);
-
-        CancelOrderRequest request = new CancelOrderRequest(orderId, userId);
-
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-
-        InvalidOrderStateException exception = assertThrows(
-                InvalidOrderStateException.class,
-                () -> orderService.cancelOrder(request)
-        );
-
-        assertEquals("El pedido con id 1 ya se encuentra cancelado", exception.getMessage());
-        verify(orderRepository, never()).save(any(Order.class));
-        verify(productClient, never()).restoreStock(anyLong(), anyInt());
-    }
-
-    /**
-     * HU-15: Valida que se lance {@link InvalidOrderStateException} si el pedido se encuentra
-     * en un estado posterior no cancelable (ej. SHIPPED o DELIVERED).
-     */
-    @Test
-    void shouldThrowInvalidOrderStateExceptionWhenOrderIsShippedOrDelivered() {
-        Long orderId = 1L;
-        Long userId = 1L;
-
-        Order order = new Order(userId, new BigDecimal("100.00"), OrderStatus.SHIPPED);
-        order.setId(orderId);
-
-        CancelOrderRequest request = new CancelOrderRequest(orderId, userId);
-
-        when(orderRepository.findById(orderId)).thenReturn(Optional.of(order));
-
-        InvalidOrderStateException exception = assertThrows(
-                InvalidOrderStateException.class,
-                () -> orderService.cancelOrder(request)
-        );
-
-        assertEquals("No es posible cancelar el pedido con id 1 porque se encuentra en estado: SHIPPED", exception.getMessage());
-        verify(orderRepository, never()).save(any(Order.class));
-        verify(productClient, never()).restoreStock(anyLong(), anyInt());
-    }
-
-
-    @Test
-    void shouldNotCancelOrderWhenStockRestorationFails() {
-
-        Long orderId = 1L;
-        Long userId = 1L;
-
-        Order order = new Order(
-                userId,
-                new BigDecimal("250.00"),
-                OrderStatus.CREATED
-        );
-        order.setId(orderId);
-
-        OrderItem item = new OrderItem();
-        item.setProductId(101L);
-        item.setQuantity(2);
-        item.setOrder(order);
-
-        order.setItems(new ArrayList<>(List.of(item)));
-
-        CancelOrderRequest request =
-                new CancelOrderRequest(orderId, userId);
-
-        when(orderRepository.findById(orderId))
-                .thenReturn(Optional.of(order));
-
-        doThrow(new RuntimeException("Error al restaurar stock"))
-                .when(productClient)
-                .restoreStock(101L, 2);
-
-        assertThrows(RuntimeException.class,
-                () -> orderService.cancelOrder(request)
-        );
-
-        assertEquals(OrderStatus.CREATED, order.getStatus());
-
-        verify(orderRepository, never())
-                .save(any(Order.class));
-    }
-
 }

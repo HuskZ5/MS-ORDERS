@@ -1,0 +1,8 @@
+description,pathId,orderId,userId,expectedStatus,refundAmount,returnedProductId,returnedQuantity,expectedHttpStatus,exceptionClass,expectedErrorMessage
+"Cancelacion exitosa en /cancel retorna 200 OK con reembolso",,1,1,CANCELLED,200.00,101,2,200,,
+"Cancelacion exitosa en /{id}/cancel sin orderId en JSON asigna pathId",1,,1,CANCELLED,200.00,101,2,200,,
+"Cancelacion exitosa en /{id}/cancel con orderId en JSON conserva orderId",1,1,1,CANCELLED,200.00,101,2,200,,
+"Cancelacion sin userId retorna 401 Unauthorized",,1,,,0,0,0,401,,Usuario no autenticado
+"Cancelacion por usuario no propietario retorna 403 Forbidden",,1,2,,0,0,0,403,com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException,"El usuario con id 2 no tiene autorización para cancelar este pedido"
+"Cancelacion de pedido en estado invalido retorna 400 Bad Request",,1,1,,0,0,0,400,com.ecommerce.orders_service.exceptions.InvalidOrderStateException,"El pedido con id 1 ya se encuentra cancelado"
+"Cancelacion de pedido inexistente retorna 404 Not Found",,999,1,,0,0,0,404,com.ecommerce.orders_service.exceptions.OrderNotFoundException,"Pedido no encontrado con id: 999"

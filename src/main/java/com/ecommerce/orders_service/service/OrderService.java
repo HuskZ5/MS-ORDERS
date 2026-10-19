@@ -20,7 +20,10 @@ import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.client.ProductClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.bind.annotation.GetMapping;
+
+import java.time.LocalDate;
+
+
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,11 +41,13 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final CartRepository cartRepository;
     private final ProductClient productClient;
+    private final CouponService couponService;
 
-    public OrderService(OrderRepository orderRepository, CartRepository cartRepository, ProductClient productClient) {
+    public OrderService(OrderRepository orderRepository, CartRepository cartRepository, ProductClient productClient, CouponService couponService) {
         this.orderRepository = orderRepository;
         this.cartRepository = cartRepository;
         this.productClient = productClient;
+        this.couponService = couponService;
     }
 
     /**
@@ -60,6 +65,29 @@ public class OrderService {
         if (orders.isEmpty()) throw new OrderNotFoundException("No hay ordenes disponibles");
         return orders.stream().map(this::mapToOrderResponse).toList();
     }
+
+
+
+    @Transactional(readOnly = true)
+    public List<OrderResponse> getTodayOrders() {
+
+        LocalDateTime start = LocalDate.now().atStartOfDay();
+        LocalDateTime end = start.plusDays(1);
+
+        List<Order> orders = orderRepository.findByCreatedAtBetween(start, end);
+
+        if (orders.isEmpty()) {
+            throw new OrderNotFoundException(
+                    "No hay órdenes registradas el día de hoy"
+            );
+        }
+
+        return orders.stream()
+                .map(this::mapToOrderResponse)
+                .toList();
+    }
+
+
 
     /**
      * HU-03: Convierte el carrito activo de un usuario en una orden de compra.
@@ -102,14 +130,32 @@ public class OrderService {
             orderItems.add(orderItem);
         }
 
+        couponService.validateAppliedCouponsForOrder(
+                cart.getId(),
+                userId,
+                totalCalculado
+        );
+
+        BigDecimal totalFinal = couponService.calculateFinalTotal(
+                cart.getId(),
+                totalCalculado
+        );
+
         order.setItems(orderItems);
-        order.setTotal(totalCalculado);
+        order.setTotal(totalFinal);
+
         for (CartItem cartItem : cart.getItems()) {
             productClient.reduceStock(cartItem.getProductId(), cartItem.getQuantity());
         }
 
         // 5. Guarda la orden y congela los registros
         Order savedOrder = orderRepository.save(order);
+
+        couponService.registerCouponUsages(
+                cart.getId(),
+                savedOrder,
+                userId
+        );
 
         // 6. Vacia el carrito activo
         cart.getItems().clear();

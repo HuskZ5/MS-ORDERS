@@ -26,10 +26,12 @@ public class CartService {
 
     private final CartRepository cartRepository;
     private final ProductClient productClient;
+    private final CouponService couponService;
 
-    public CartService(CartRepository cartRepository, ProductClient productClient) {
+    public CartService(CartRepository cartRepository, ProductClient productClient, CouponService couponService) {
         this.cartRepository = cartRepository;
         this.productClient = productClient;
+        this.couponService = couponService;
     }
 
     /**
@@ -174,10 +176,23 @@ public class CartService {
                         ))
                         .collect(Collectors.toList()) : new ArrayList<>();
 
-        BigDecimal total = itemDtos.stream()
+        BigDecimal subtotal = itemDtos.stream()
                 .map(item -> item.getPrice().multiply(BigDecimal.valueOf(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return new CartResponse(cart.getId(), cart.getUserId(), itemDtos, total);
+        BigDecimal discountAmount = cart.getId() != null
+                ? couponService.calculateDiscount(cart.getId(), subtotal)
+                : BigDecimal.ZERO;
+
+        BigDecimal totalAmount = subtotal.subtract(discountAmount);
+
+        return new CartResponse(
+                cart.getId(),
+                cart.getUserId(),
+                itemDtos,
+                subtotal,
+                discountAmount,
+                totalAmount
+        );
     }
 }

@@ -15,4 +15,6 @@ public class AddToCartRequest {
     private Long productId;
     private Integer quantity;
     //private BigDecimal price;
+
+    // Getters y Setters
 }

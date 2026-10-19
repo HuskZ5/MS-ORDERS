@@ -1,0 +1,3 @@
+description,cartId,userId,itemId,productId,quantity,price,totalAmount,expectedHttpStatus,exceptionClass,expectedErrorMessage
+"Consulta exitosa de carrito por userId retorna 200 OK",10,1,1,101,2,50.00,100.00,200,,
+"Consulta de carrito inexistente por userId retorna 404 Not Found",,99,,,,,0.00,404,com.ecommerce.orders_service.exceptions.CartNotFoundException,"No se encontró carrito para el usuario 99"
