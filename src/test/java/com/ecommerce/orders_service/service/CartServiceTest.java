@@ -3,6 +3,7 @@ package com.ecommerce.orders_service.service;
 import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.AddToCartRequest;
 import com.ecommerce.orders_service.dto.CartResponse;
+import com.ecommerce.orders_service.exceptions.BusinessOperationException;
 import com.ecommerce.orders_service.dto.ProductResponse;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.repository.CartRepository;
@@ -23,10 +24,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Optional;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -179,4 +182,22 @@ class CartServiceTest {
             verify(cartRepository).findByUserId(scenario.userId());
         }
     }
+    @Test
+    void testMaxUnitsPerProduct() {
+        // Configura el mock para devolver un producto válido
+        when(productClient.getProductById(101L))
+                .thenReturn(new ProductResponse("Laptop", "Lenovo", new BigDecimal("200.00"), 10));
+
+        // Configura el repositorio para devolver un carrito vacío
+        Cart cart = new Cart();
+        cart.setUserId(1L);
+        when(cartRepository.findByUserId(1L)).thenReturn(Optional.of(cart));
+        when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        // Ahora sí, lanza la excepción de negocio
+        AddToCartRequest request = new AddToCartRequest(1L, 101L, 6);
+        assertThrows(BusinessOperationException.class, () -> cartService.addItemToCart(request));
+    }
+
+
 }
