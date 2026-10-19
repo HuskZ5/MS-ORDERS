@@ -99,4 +99,30 @@ INSERT INTO coupons (
     2,
     1,
     FALSE
+),
+
+-- Cupones temporales para validar que el descuento total
+-- nunca supere el subtotal del carrito.
+-- Permanecen inactivos por defecto y se habilitan solo durante la prueba.
+(
+    'TEST_CAP60_A',
+    60.00,
+    DATE_SUB(NOW(), INTERVAL 1 DAY),
+    DATE_ADD(NOW(), INTERVAL 1 DAY),
+    NULL,
+    FALSE,
+    NULL,
+    NULL,
+    TRUE
+),
+(
+    'TEST_CAP60_B',
+    60.00,
+    DATE_SUB(NOW(), INTERVAL 1 DAY),
+    DATE_ADD(NOW(), INTERVAL 1 DAY),
+    NULL,
+    FALSE,
+    NULL,
+    NULL,
+    TRUE
 );
