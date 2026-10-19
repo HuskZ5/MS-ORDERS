@@ -10,6 +10,13 @@ public class AddToCartRequest {
 
     public AddToCartRequest() {}
 
+    public AddToCartRequest(Long userId, Long productId, Integer quantity) {
+        this.userId = userId;
+        this.productId = productId;
+        this.quantity = quantity;
+        //this.price = price;
+    }
+
     // Getters y Setters
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; }

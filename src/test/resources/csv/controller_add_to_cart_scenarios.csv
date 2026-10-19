@@ -1,0 +1,5 @@
+description,cartId,userId,itemId,productId,quantity,price,totalAmount,expectedHttpStatus,exceptionClass,expectedErrorMessage
+"Agrega producto exitosamente al carrito y retorna 200 OK",10,1,1,101,2,50.00,100.00,200,,
+"Falla al agregar producto inexistente y retorna 404 Not Found",,1,,999,1,,,404,com.ecommerce.orders_service.exceptions.ProductNotFoundException,"Producto no encontrado con id: 999"
+"Falla al agregar producto sin stock disponible y retorna 409 Conflict",,1,,101,50,,,409,com.ecommerce.orders_service.exceptions.ProductOutOfStockException,"Stock insuficiente para el producto 101"
+"Falla al agregar cantidad invalida al carrito y retorna 400 Bad Request",,1,,101,0,,,400,com.ecommerce.orders_service.exceptions.InvalidCartOperationException,"La cantidad solicitada debe ser mayor a cero"

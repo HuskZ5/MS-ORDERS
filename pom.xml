@@ -121,6 +121,67 @@
 					</execution>
 				</executions>
 			</plugin>
+
+			<!-- Add new Plugin for JaCoCo (Java Code Coverage) version 0.8.11 -->
+			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>0.8.15</version>
+				<executions>
+
+					<!-- Default prepare-agent execution to attach the JaCoCo agent to the JVM -->
+					<execution>
+						<id>prepare-agent</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+
+					<!-- Generate the coverage report after tests have run after running the tests -->
+					<execution>
+						<id>report</id>
+						<phase>test</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+
+					<!-- Strict coverage check 95%: If coverage is below 95%, the build will fail -->
+					<execution>
+						<id>check-coverage</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element> <!-- Evalúa el proyecto entero -->
+									<limits>
+										<limit>
+											<counter>INSTRUCTION</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.95</minimum> <!-- 95% minimum coverage -->
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+
+				<!-- Exclusions for JaCoCo coverage -->
+				<configuration>
+					<excludes>
+						<exclude>**/dto/**</exclude>
+						<exclude>**/model/**</exclude>
+						<exclude>**/exceptions/**</exclude>
+						<exclude>**/config/**</exclude>
+						<exclude>**/client/**</exclude>
+						<exclude>**/*Application.class</exclude>
+					</excludes>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
