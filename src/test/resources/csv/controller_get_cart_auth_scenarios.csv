@@ -1,4 +1,0 @@
-description,cartId,headerUserId,itemId,productId,quantity,price,totalAmount,expectedHttpStatus,exceptionClass,expectedErrorMessage
-"Consulta exitosa de carrito autenticado con header X-USER-ID retorna 200 OK",10,1,1,101,2,50.00,100.00,200,,
-"Consulta de carrito sin header X-USER-ID retorna 401 Unauthorized",,,,,,,0.00,401,,Usuario no autenticado
-"Consulta de carrito autenticado inexistente retorna 404 Not Found",,99,,,,,0.00,404,com.ecommerce.orders_service.exceptions.CartNotFoundException,"No se encontró carrito para el usuario 99"

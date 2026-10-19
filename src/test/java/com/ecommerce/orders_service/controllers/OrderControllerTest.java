@@ -5,20 +5,16 @@ import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
 import com.ecommerce.orders_service.service.OrderService;
-import com.ecommerce.orders_service.sources.aggregators.ControllerCancelOrderScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.ControllerCreateOrderScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.ControllerGetAllOrdersScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.ControllerGetOrderScenarioAggregator;
 import com.ecommerce.orders_service.sources.builders.OrderTestDataBuilder;
-import com.ecommerce.orders_service.sources.scenarios.ControllerCancelOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerCreateOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerGetAllOrdersScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerGetOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerCancelOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerCreateOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetAllOrdersScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetTodayOrdersScenario;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.aggregator.AggregateWith;
-import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -41,7 +37,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * <p>
  * Implementa la regla estricta <b>Zero Hardcoded Data</b>:
  * <ul>
- *   <li>Casos de prueba parametrizados mediante {@link CsvFileSource} e inyectados con {@link AggregateWith}.</li>
+ *   <li>Casos de prueba parametrizados mediante {@link MethodSource} e inyectados con Records desde {@code OrderScenarioProvider}.</li>
  *   <li>Serialización JSON delegada a {@link ObjectMapper}.</li>
  *   <li>Construcción de DTOs centralizada en {@link OrderTestDataBuilder} sin operadores {@code new} en el test.</li>
  * </ul>
@@ -64,10 +60,9 @@ class OrderControllerTest {
     class GetAllOrdersTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/controller_get_all_orders_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios web de listado de todas las órdenes desde CSV")
-        void shouldHandleGetAllOrdersScenarios(
-                @AggregateWith(ControllerGetAllOrdersScenarioAggregator.class) ControllerGetAllOrdersScenario scenario) throws Exception {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideControllerGetAllOrdersScenarios")
+        @DisplayName("Escenarios web de listado de todas las órdenes")
+        void shouldHandleGetAllOrdersScenarios(ControllerGetAllOrdersScenario scenario) throws Exception {
 
             if (scenario.exceptionClass() != null) {
                 Throwable ex = scenario.exceptionClass()
@@ -96,14 +91,48 @@ class OrderControllerTest {
     }
 
     @Nested
+    @DisplayName("GET /api/orders/today (Listado de pedidos del día)")
+    class GetTodayOrdersTests {
+
+        @ParameterizedTest(name = "{index} - {0}")
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideControllerGetTodayOrdersScenarios")
+        @DisplayName("Escenarios web de listado de órdenes del día")
+        void shouldHandleGetTodayOrdersScenarios(ControllerGetTodayOrdersScenario scenario) throws Exception {
+
+            if (scenario.exceptionClass() != null) {
+                Throwable ex = scenario.exceptionClass()
+                        .getDeclaredConstructor(String.class)
+                        .newInstance(scenario.expectedErrorMessage());
+                when(orderService.getTodayOrders()).thenThrow(ex);
+
+                mockMvc.perform(get("/api/orders/today"))
+                        .andExpect(status().is(scenario.expectedHttpStatus()))
+                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+            } else {
+                List<OrderResponse> responses = OrderTestDataBuilder.buildOrderResponseList(scenario);
+                when(orderService.getTodayOrders()).thenReturn(responses);
+
+                mockMvc.perform(get("/api/orders/today"))
+                        .andExpect(status().is(scenario.expectedHttpStatus()))
+                        .andExpect(jsonPath("$[0].id").value(scenario.orderId()))
+                        .andExpect(jsonPath("$[0].userId").value(scenario.userId()))
+                        .andExpect(jsonPath("$[0].total").value(Double.parseDouble(scenario.total())))
+                        .andExpect(jsonPath("$[0].status").value(scenario.status()))
+                        .andExpect(jsonPath("$[0].items[0].productId").value(scenario.productId()))
+                        .andExpect(jsonPath("$[0].items[0].quantity").value(scenario.quantity()))
+                        .andExpect(jsonPath("$[0].items[0].unitPrice").value(Double.parseDouble(scenario.unitPrice())));
+            }
+        }
+    }
+
+    @Nested
     @DisplayName("GET /api/orders/{id} (HU-14)")
     class GetOrderTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/controller_get_order_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios web de consulta de pedido por ID desde CSV")
-        void shouldHandleGetOrderScenarios(
-                @AggregateWith(ControllerGetOrderScenarioAggregator.class) ControllerGetOrderScenario scenario) throws Exception {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideControllerGetOrderScenarios")
+        @DisplayName("Escenarios web de consulta de pedido por ID")
+        void shouldHandleGetOrderScenarios(ControllerGetOrderScenario scenario) throws Exception {
 
             if (scenario.exceptionClass() != null) {
                 Throwable ex = scenario.exceptionClass()
@@ -136,10 +165,9 @@ class OrderControllerTest {
     class CreateOrderTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/controller_create_order_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios web de creación de orden desde carrito vía CSV")
-        void shouldHandleCreateOrderScenarios(
-                @AggregateWith(ControllerCreateOrderScenarioAggregator.class) ControllerCreateOrderScenario scenario) throws Exception {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideControllerCreateOrderScenarios")
+        @DisplayName("Escenarios web de creación de orden desde carrito")
+        void shouldHandleCreateOrderScenarios(ControllerCreateOrderScenario scenario) throws Exception {
 
             if (scenario.exceptionClass() != null) {
                 Throwable ex = scenario.exceptionClass()
@@ -174,10 +202,9 @@ class OrderControllerTest {
     class CancelOrderTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/controller_cancel_order_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios web de cancelación de pedido desde CSV")
-        void shouldHandleCancelOrderScenarios(
-                @AggregateWith(ControllerCancelOrderScenarioAggregator.class) ControllerCancelOrderScenario scenario) throws Exception {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.OrderScenarioProvider#provideControllerCancelOrderScenarios")
+        @DisplayName("Escenarios web de cancelación de pedido")
+        void shouldHandleCancelOrderScenarios(ControllerCancelOrderScenario scenario) throws Exception {
 
             CancelOrderRequest request = OrderTestDataBuilder.buildCancelOrderRequest(scenario);
             String jsonPayload = objectMapper.writeValueAsString(request);

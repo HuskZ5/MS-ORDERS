@@ -1,3 +1,0 @@
-description,hasOrders,orderId,userId,total,status,productId,quantity,unitPrice,expectedOrdersCount,expectedException,expectedErrorMessage
-"Consulta exitosa de todas las ordenes cuando existen registros",true,1,1,330.00,CREATED,101,2,165.00,1,,
-"Falla al consultar todas las ordenes cuando la base de datos esta vacia",false,0,0,0.00,CREATED,0,0,0.00,0,com.ecommerce.orders_service.exceptions.OrderNotFoundException,"No hay ordenes disponibles"

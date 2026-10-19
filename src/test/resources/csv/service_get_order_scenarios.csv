@@ -1,3 +1,0 @@
-description,orderId,orderExists,userId,total,status,productId,quantity,unitPrice,expectedException,expectedErrorMessage
-"Consulta exitosa de pedido existente con items",1,true,1,330.00,CREATED,101,2,165.00,,
-"Falla al consultar pedido inexistente en base de datos",999,false,0,0.00,CREATED,0,0,0.00,com.ecommerce.orders_service.exceptions.OrderNotFoundException,"Pedido no encontrado con id: 999"

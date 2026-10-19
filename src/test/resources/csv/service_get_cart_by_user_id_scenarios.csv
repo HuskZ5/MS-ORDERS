@@ -1,4 +1,0 @@
-description,cartExists,itemsNull,cartId,userId,productId,quantity,price,expectedItemsCount,expectedTotalAmount
-"Obtiene carrito existente con items para el usuario",true,false,10,1,101,2,50.00,1,100.00
-"Crea y retorna carrito vacio mediante orElseGet cuando el usuario no tiene carrito",false,false,,2,,,,0,0.00
-"Retorna carrito con lista vacia cuando el carrito en BD tiene items nulos",true,true,11,3,,,,0,0.00

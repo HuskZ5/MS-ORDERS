@@ -8,11 +8,12 @@ import com.ecommerce.orders_service.dto.OrderResponse;
 import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.model.OrderItem;
 import com.ecommerce.orders_service.model.OrderStatus;
-import com.ecommerce.orders_service.sources.scenarios.CancelOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerCancelOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerCreateOrderScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerGetAllOrdersScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerGetOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.CancelOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerCancelOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerCreateOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetAllOrdersScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetOrderScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetTodayOrdersScenario;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -97,6 +98,24 @@ public class OrderTestDataBuilder {
     }
 
     public static List<OrderResponse> buildOrderResponseList(ControllerGetAllOrdersScenario scenario) {
+        OrderItemDto item = new OrderItemDto(
+                scenario.itemId(),
+                scenario.productId(),
+                scenario.quantity(),
+                new BigDecimal(scenario.unitPrice())
+        );
+        OrderResponse response = new OrderResponse(
+                scenario.orderId(),
+                scenario.userId(),
+                new BigDecimal(scenario.total()),
+                scenario.status(),
+                LocalDateTime.now(),
+                List.of(item)
+        );
+        return List.of(response);
+    }
+
+    public static List<OrderResponse> buildOrderResponseList(ControllerGetTodayOrdersScenario scenario) {
         OrderItemDto item = new OrderItemDto(
                 scenario.itemId(),
                 scenario.productId(),

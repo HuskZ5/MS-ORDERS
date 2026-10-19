@@ -3,33 +3,29 @@ package com.ecommerce.orders_service.service;
 import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.AddToCartRequest;
 import com.ecommerce.orders_service.dto.CartResponse;
-import com.ecommerce.orders_service.exceptions.BusinessOperationException;
 import com.ecommerce.orders_service.dto.ProductResponse;
+import com.ecommerce.orders_service.exceptions.ProductNotFoundException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.repository.CartRepository;
-import com.ecommerce.orders_service.sources.aggregators.AddToCartScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.GetCartByUserIdScenarioAggregator;
-import com.ecommerce.orders_service.sources.aggregators.GetCartScenarioAggregator;
 import com.ecommerce.orders_service.sources.builders.CartTestDataBuilder;
-import com.ecommerce.orders_service.sources.scenarios.AddToCartScenario;
-import com.ecommerce.orders_service.sources.scenarios.GetCartByUserIdScenario;
-import com.ecommerce.orders_service.sources.scenarios.GetCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.AddToCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.GetCartByUserIdScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.GetCartScenario;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.aggregator.AggregateWith;
-import org.junit.jupiter.params.provider.CsvFileSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -40,8 +36,7 @@ import static org.mockito.Mockito.*;
  * <ul>
  *   <li>Estructura jerárquica con {@link Nested} y {@link DisplayName}.</li>
  *   <li>Aserciones fluidas exclusivamente con AssertJ ({@code assertThat}).</li>
- *   <li>Pruebas parametrizadas alimentadas 100% desde {@link CsvFileSource} e inyectadas
- *       mediante {@link AggregateWith} hacia Records de escenario.</li>
+ *   <li>Pruebas parametrizadas alimentadas desde {@code CartScenarioProvider} mediante {@link MethodSource}.</li>
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -54,18 +49,25 @@ class CartServiceTest {
     @Mock
     private ProductClient productClient;
 
+    @Mock
+    private CouponService couponService;
+
     @InjectMocks
     private CartService cartService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(couponService.calculateDiscount(any(), any())).thenReturn(BigDecimal.ZERO);
+    }
 
     @Nested
     @DisplayName("Consulta de Carrito por ID de Usuario (getCartByUserId)")
     class GetCartByUserIdTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/service_get_cart_by_user_id_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de consulta o creación por defecto de carrito por userId desde CSV")
-        void shouldHandleGetCartByUserIdScenarios(
-                @AggregateWith(GetCartByUserIdScenarioAggregator.class) GetCartByUserIdScenario scenario) {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.CartScenarioProvider#provideGetCartByUserIdScenarios")
+        @DisplayName("Escenarios de consulta o creación por defecto de carrito por userId")
+        void shouldHandleGetCartByUserIdScenarios(GetCartByUserIdScenario scenario) {
 
             if (scenario.cartExists()) {
                 Cart existingCart = CartTestDataBuilder.aCart()
@@ -96,14 +98,14 @@ class CartServiceTest {
     class AddItemToCartTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/service_add_to_cart_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de inserción, acumulación y validación en carrito desde CSV")
-        void shouldHandleAddToCartScenarios(
-                @AggregateWith(AddToCartScenarioAggregator.class) AddToCartScenario scenario) throws Exception {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.CartScenarioProvider#provideAddToCartScenarios")
+        @DisplayName("Escenarios de inserción, acumulación y validación en carrito")
+        void shouldHandleAddToCartScenarios(AddToCartScenario scenario) throws Exception {
 
             AddToCartRequest request = CartTestDataBuilder.buildAddToCartRequest(scenario);
 
-            if (scenario.expectedException() != null) {
+            if (scenario.expectedException() != null
+                    && ProductNotFoundException.class.isAssignableFrom(scenario.expectedException())) {
                 Throwable ex = scenario.expectedException()
                         .getDeclaredConstructor(String.class)
                         .newInstance(scenario.expectedErrorMessage());
@@ -121,7 +123,12 @@ class CartServiceTest {
                             .withId(scenario.cartId())
                             .withUserId(scenario.userId())
                             .withNullItems(scenario.itemsNull())
-                            .withItem(scenario.existingProductId(), scenario.existingQuantity(), scenario.existingPrice())
+                            .withMultipleItems(
+                                    scenario.existingLinesCount(),
+                                    scenario.existingProductId(),
+                                    scenario.existingQuantity(),
+                                    scenario.existingPrice()
+                            )
                             .build();
                     when(cartRepository.findByUserId(scenario.userId())).thenReturn(Optional.of(existingCart));
                 } else {
@@ -130,18 +137,29 @@ class CartServiceTest {
 
                 ProductResponse productResponse = CartTestDataBuilder.buildProductResponse(scenario);
                 when(productClient.getProductById(scenario.requestProductId())).thenReturn(productResponse);
-                when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
 
-                CartResponse response = cartService.addItemToCart(request);
+                if (scenario.expectedException() != null) {
+                    assertThatThrownBy(() -> cartService.addItemToCart(request))
+                            .isInstanceOf(scenario.expectedException())
+                            .hasMessage(scenario.expectedErrorMessage());
 
-                assertThat(response).isNotNull();
-                assertThat(response.getUserId()).isEqualTo(scenario.userId());
-                assertThat(response.getItems()).hasSize(scenario.expectedItemsCount());
-                assertThat(response.getTotalAmount()).isEqualByComparingTo(scenario.expectedTotalAmount());
+                    verify(productClient).getProductById(scenario.requestProductId());
+                    verify(cartRepository).findByUserId(scenario.userId());
+                    verify(cartRepository, never()).save(any(Cart.class));
+                } else {
+                    when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
 
-                verify(productClient).getProductById(scenario.requestProductId());
-                verify(cartRepository).findByUserId(scenario.userId());
-                verify(cartRepository).save(any(Cart.class));
+                    CartResponse response = cartService.addItemToCart(request);
+
+                    assertThat(response).isNotNull();
+                    assertThat(response.getUserId()).isEqualTo(scenario.userId());
+                    assertThat(response.getItems()).hasSize(scenario.expectedItemsCount());
+                    assertThat(response.getTotalAmount()).isEqualByComparingTo(scenario.expectedTotalAmount());
+
+                    verify(productClient).getProductById(scenario.requestProductId());
+                    verify(cartRepository).findByUserId(scenario.userId());
+                    verify(cartRepository).save(any(Cart.class));
+                }
             }
         }
     }
@@ -151,10 +169,9 @@ class CartServiceTest {
     class GetCartTests {
 
         @ParameterizedTest(name = "{index} - {0}")
-        @CsvFileSource(resources = "/csv/service_get_cart_scenarios.csv", numLinesToSkip = 1)
-        @DisplayName("Escenarios de consulta de carrito por usuario autenticado desde CSV")
-        void shouldHandleGetCartScenarios(
-                @AggregateWith(GetCartScenarioAggregator.class) GetCartScenario scenario) {
+        @MethodSource("com.ecommerce.orders_service.sources.providers.CartScenarioProvider#provideGetCartScenarios")
+        @DisplayName("Escenarios de consulta de carrito por usuario autenticado")
+        void shouldHandleGetCartScenarios(GetCartScenario scenario) {
 
             if (scenario.cartExists()) {
                 Cart existingCart = CartTestDataBuilder.aCart()
@@ -182,22 +199,4 @@ class CartServiceTest {
             verify(cartRepository).findByUserId(scenario.userId());
         }
     }
-    @Test
-    void testMaxUnitsPerProduct() {
-        // Configura el mock para devolver un producto válido
-        when(productClient.getProductById(101L))
-                .thenReturn(new ProductResponse("Laptop", "Lenovo", new BigDecimal("200.00"), 10));
-
-        // Configura el repositorio para devolver un carrito vacío
-        Cart cart = new Cart();
-        cart.setUserId(1L);
-        when(cartRepository.findByUserId(1L)).thenReturn(Optional.of(cart));
-        when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        // Ahora sí, lanza la excepción de negocio
-        AddToCartRequest request = new AddToCartRequest(1L, 101L, 6);
-        assertThrows(BusinessOperationException.class, () -> cartService.addItemToCart(request));
-    }
-
-
 }

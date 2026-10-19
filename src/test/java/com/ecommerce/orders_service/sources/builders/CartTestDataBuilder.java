@@ -1,15 +1,17 @@
 package com.ecommerce.orders_service.sources.builders;
 
 import com.ecommerce.orders_service.dto.AddToCartRequest;
+import com.ecommerce.orders_service.dto.ApplyCouponRequest;
 import com.ecommerce.orders_service.dto.CartItemDto;
 import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.dto.ProductResponse;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
-import com.ecommerce.orders_service.sources.scenarios.AddToCartScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerAddToCartScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerGetCartAuthScenario;
-import com.ecommerce.orders_service.sources.scenarios.ControllerGetCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.AddToCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerAddToCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerApplyCouponScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerGetCartAuthScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerGetCartScenario;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -62,6 +64,20 @@ public class CartTestDataBuilder {
         return this;
     }
 
+    public CartTestDataBuilder withMultipleItems(Integer linesCount, Long baseProductId, Integer quantity, String price) {
+        int count = linesCount != null ? linesCount : 0;
+        if (count == 1) {
+            return withItem(baseProductId, quantity, price);
+        }
+        if (count > 1 && price != null && !price.isBlank()) {
+            long startId = baseProductId != null ? baseProductId : 1L;
+            for (int i = 0; i < count; i++) {
+                withItem(startId + i, quantity, price);
+            }
+        }
+        return this;
+    }
+
     public Cart build() {
         Cart cart = new Cart();
         cart.setId(this.id);
@@ -95,6 +111,10 @@ public class CartTestDataBuilder {
         return request;
     }
 
+    public static ApplyCouponRequest buildApplyCouponRequest(ControllerApplyCouponScenario scenario) {
+        return new ApplyCouponRequest(scenario.couponCode());
+    }
+
     public static ProductResponse buildProductResponse(AddToCartScenario scenario) {
         ProductResponse response = new ProductResponse();
         response.setPrice(new BigDecimal(scenario.catalogPrice()));
@@ -108,11 +128,14 @@ public class CartTestDataBuilder {
                 scenario.quantity(),
                 new BigDecimal(scenario.price())
         );
+        BigDecimal total = new BigDecimal(scenario.totalAmount());
         return new CartResponse(
                 scenario.cartId(),
                 scenario.userId(),
                 List.of(itemDto),
-                new BigDecimal(scenario.totalAmount())
+                total,
+                BigDecimal.ZERO,
+                total
         );
     }
 
@@ -123,11 +146,14 @@ public class CartTestDataBuilder {
                 scenario.quantity(),
                 new BigDecimal(scenario.price())
         );
+        BigDecimal total = new BigDecimal(scenario.totalAmount());
         return new CartResponse(
                 scenario.cartId(),
                 scenario.userId(),
                 List.of(itemDto),
-                new BigDecimal(scenario.totalAmount())
+                total,
+                BigDecimal.ZERO,
+                total
         );
     }
 
@@ -138,10 +164,30 @@ public class CartTestDataBuilder {
                 scenario.quantity(),
                 new BigDecimal(scenario.price())
         );
+        BigDecimal total = new BigDecimal(scenario.totalAmount());
         return new CartResponse(
                 scenario.cartId(),
                 scenario.headerUserId(),
                 List.of(itemDto),
+                total,
+                BigDecimal.ZERO,
+                total
+        );
+    }
+
+    public static CartResponse buildCartResponse(ControllerApplyCouponScenario scenario) {
+        CartItemDto itemDto = new CartItemDto(
+                scenario.itemId(),
+                scenario.productId(),
+                scenario.quantity(),
+                new BigDecimal(scenario.price())
+        );
+        return new CartResponse(
+                scenario.cartId(),
+                scenario.userId(),
+                List.of(itemDto),
+                new BigDecimal(scenario.subtotal()),
+                new BigDecimal(scenario.discountAmount()),
                 new BigDecimal(scenario.totalAmount())
         );
     }
