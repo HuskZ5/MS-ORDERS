@@ -5,11 +5,8 @@ import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.ItemReturned;
 import com.ecommerce.orders_service.dto.OrderItemDto;
 import com.ecommerce.orders_service.dto.OrderResponse;
-import com.ecommerce.orders_service.exceptions.CartEmptyException;
-import com.ecommerce.orders_service.exceptions.CartNotFoundException;
-import com.ecommerce.orders_service.exceptions.InvalidOrderStateException;
-import com.ecommerce.orders_service.exceptions.OrderNotFoundException;
-import com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException;
+import com.ecommerce.orders_service.exceptions.*;
+import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.model.Order;
@@ -173,9 +170,23 @@ public class OrderService {
      * @throws OrderNotFoundException si la orden no existe.
      */
     @Transactional(readOnly = true)
-    public OrderResponse getOrderById(Long id) {
+    public OrderResponse getOrderById(Long id, Long authenticatedUserId) {
+        if (authenticatedUserId == null) {
+            throw new UnauthorizedUserException(
+                    "Usuario no autenticado"
+            );
+        }
+
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException("Pedido no encontrado con id: " + id));
+                .orElseThrow(() -> new OrderNotFoundException(
+                        "Pedido no encontrado con id: " + id
+                ));
+
+        if (!order.getUserId().equals(authenticatedUserId)) {
+            throw new UnauthorizedOrderAccessException(
+                    "No tienes autorización para consultar esta orden"
+            );
+        }
 
         return mapToOrderResponse(order);
     }

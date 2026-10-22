@@ -4,6 +4,7 @@ import com.ecommerce.orders_service.config.WebControllerTest;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException;
 import com.ecommerce.orders_service.service.OrderService;
 import com.ecommerce.orders_service.sources.builders.OrderTestDataBuilder;
 import com.ecommerce.orders_service.sources.scenarios.order.ControllerCancelOrderScenario;
@@ -13,10 +14,12 @@ import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetOrderSc
 import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetTodayOrdersScenario;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -26,6 +29,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -134,20 +138,27 @@ class OrderControllerTest {
         @DisplayName("Escenarios web de consulta de pedido por ID")
         void shouldHandleGetOrderScenarios(ControllerGetOrderScenario scenario) throws Exception {
 
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            String.valueOf(scenario.userId()),
+                            null,
+                            java.util.Collections.emptyList()
+                    );
+
             if (scenario.exceptionClass() != null) {
                 Throwable ex = scenario.exceptionClass()
                         .getDeclaredConstructor(String.class)
                         .newInstance(scenario.expectedErrorMessage());
-                when(orderService.getOrderById(scenario.orderId())).thenThrow(ex);
+                when(orderService.getOrderById(scenario.orderId(), scenario.userId())).thenThrow(ex);
 
-                mockMvc.perform(get("/api/orders/{id}", scenario.orderId()))
+                mockMvc.perform(get("/api/orders/{id}", scenario.orderId()).principal(authentication))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
                         .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
             } else {
                 OrderResponse response = OrderTestDataBuilder.buildOrderResponse(scenario);
-                when(orderService.getOrderById(scenario.orderId())).thenReturn(response);
+                when(orderService.getOrderById(scenario.orderId(), scenario.userId())).thenReturn(response);
 
-                mockMvc.perform(get("/api/orders/{id}", scenario.orderId()))
+                mockMvc.perform(get("/api/orders/{id}", scenario.orderId()).principal(authentication))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
                         .andExpect(jsonPath("$.id").value(scenario.orderId()))
                         .andExpect(jsonPath("$.userId").value(scenario.userId()))
@@ -157,6 +168,46 @@ class OrderControllerTest {
                         .andExpect(jsonPath("$.items[0].quantity").value(scenario.quantity()))
                         .andExpect(jsonPath("$.items[0].unitPrice").value(Double.parseDouble(scenario.unitPrice())));
             }
+        }
+
+        @Test
+        @DisplayName("Retorna 401 cuando el usuario no está autenticado")
+        void shouldReturn401WhenUserIsNotAuthenticated() throws Exception {
+
+            mockMvc.perform(get("/api/orders/{id}", 15L))
+                    .andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.error")
+                            .value("Usuario no autenticado"));
+
+            verifyNoInteractions(orderService);
+        }
+
+        @Test
+        @DisplayName("Retorna 403 cuando la orden pertenece a otro usuario")
+        void shouldReturn403WhenUserDoesNotOwnOrder() throws Exception {
+
+            Long orderId = 15L;
+            Long authenticatedUserId = 2L;
+
+            UsernamePasswordAuthenticationToken authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            String.valueOf(authenticatedUserId),
+                            null,
+                            java.util.Collections.emptyList()
+                    );
+
+            when(orderService.getOrderById(orderId, authenticatedUserId))
+                    .thenThrow(new UnauthorizedOrderAccessException(
+                            "No tienes autorización para consultar esta orden"
+                    ));
+
+            mockMvc.perform(
+                            get("/api/orders/{id}", orderId)
+                                    .principal(authentication)
+                    )
+                    .andExpect(status().isForbidden())
+                    .andExpect(jsonPath("$.error")
+                            .value("No tienes autorización para consultar esta orden"));
         }
     }
 

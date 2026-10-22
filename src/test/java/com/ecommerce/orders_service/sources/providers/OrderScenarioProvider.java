@@ -68,7 +68,7 @@ public final class OrderScenarioProvider {
                 ),
                 new ControllerGetOrderScenario(
                         "Consulta de pedido inexistente retorna 404 Not Found",
-                        999L, null, null, null, null, 0L, 0, "0.00", 404,
+                        999L, 1L, null, null, null, 0L, 0, "0.00", 404,
                         OrderNotFoundException.class, "Pedido no encontrado con id: 999"
                 )
         );
