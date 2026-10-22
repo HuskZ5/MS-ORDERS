@@ -4,6 +4,8 @@ import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException;
+import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.repository.CartRepository;
@@ -17,6 +19,7 @@ import com.ecommerce.orders_service.sources.scenarios.order.GetOrderScenario;
 import com.ecommerce.orders_service.sources.scenarios.order.GetTodayOrdersScenario;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -173,7 +176,7 @@ class OrderServiceTest {
 
                 when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.of(order));
 
-                OrderResponse response = orderService.getOrderById(scenario.orderId());
+                OrderResponse response = orderService.getOrderById(scenario.orderId(), scenario.userId());
 
                 assertThat(response).isNotNull();
                 assertThat(response.getId()).isEqualTo(scenario.orderId());
@@ -191,12 +194,52 @@ class OrderServiceTest {
             } else {
                 when(orderRepository.findById(scenario.orderId())).thenReturn(Optional.empty());
 
-                assertThatThrownBy(() -> orderService.getOrderById(scenario.orderId()))
+                assertThatThrownBy(() -> orderService.getOrderById(scenario.orderId(), scenario.userId()))
                         .isInstanceOf(scenario.expectedException())
                         .hasMessage(scenario.expectedErrorMessage());
             }
 
             verify(orderRepository).findById(scenario.orderId());
+        }
+
+        @Test
+        @DisplayName("No permite consultar una orden de otro usuario")
+        void shouldRejectOrderFromAnotherUser() {
+
+            Long orderId = 15L;
+            Long orderOwnerId = 10L;
+            Long authenticatedUserId = 7L;
+
+            Order order = OrderTestDataBuilder.anOrder()
+                    .withId(orderId)
+                    .withUserId(orderOwnerId)
+                    .build();
+
+            when(orderRepository.findById(orderId))
+                    .thenReturn(Optional.of(order));
+
+            assertThatThrownBy(() ->
+                    orderService.getOrderById(orderId, authenticatedUserId)
+            )
+                    .isInstanceOf(UnauthorizedOrderAccessException.class)
+                    .hasMessage("No tienes autorización para consultar esta orden");
+
+            verify(orderRepository).findById(orderId);
+        }
+
+        @Test
+        @DisplayName("No permite consultar una orden sin usuario autenticado")
+        void shouldRejectUnauthenticatedUser() {
+
+            Long orderId = 15L;
+
+            assertThatThrownBy(() ->
+                    orderService.getOrderById(orderId, null)
+            )
+                    .isInstanceOf(UnauthorizedUserException.class)
+                    .hasMessage("Usuario no autenticado");
+
+            verify(orderRepository, never()).findById(anyLong());
         }
     }
 
