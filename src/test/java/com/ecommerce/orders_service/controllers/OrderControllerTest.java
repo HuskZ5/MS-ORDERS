@@ -249,7 +249,7 @@ class OrderControllerTest {
     }
 
     @Nested
-    @DisplayName("PATCH /api/orders/cancel y /api/orders/{id}/cancel (HU-15)")
+    @DisplayName("PATCH /api/orders/cancel y /api/orders/{id}/cancel (HU-07)")
     class CancelOrderTests {
 
         @ParameterizedTest(name = "{index} - {0}")
@@ -259,6 +259,16 @@ class OrderControllerTest {
 
             CancelOrderRequest request = OrderTestDataBuilder.buildCancelOrderRequest(scenario);
             String jsonPayload = objectMapper.writeValueAsString(request);
+
+            UsernamePasswordAuthenticationToken authentication = null;
+
+            if (scenario.userId() != null) {
+                authentication = new UsernamePasswordAuthenticationToken(
+                        String.valueOf(scenario.userId()),
+                        null,
+                        java.util.Collections.emptyList()
+                );
+            }
 
             if (scenario.exceptionClass() != null) {
                 Throwable ex = scenario.exceptionClass()
@@ -275,6 +285,10 @@ class OrderControllerTest {
                     : patch("/api/orders/cancel");
 
             requestBuilder.contentType(MediaType.APPLICATION_JSON).content(jsonPayload);
+
+            if (authentication != null) {
+                requestBuilder.principal(authentication);
+            }
 
             if (scenario.expectedErrorMessage() != null && !scenario.expectedErrorMessage().isBlank()) {
                 mockMvc.perform(requestBuilder)

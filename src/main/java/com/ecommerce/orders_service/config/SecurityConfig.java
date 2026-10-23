@@ -29,6 +29,12 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.GET, "/api/orders/{id}")
                         .authenticated()
+                        .requestMatchers(
+                                HttpMethod.PATCH,
+                                "/api/orders/{id}/cancel",
+                                "/api/orders/cancel"
+                        )
+                        .authenticated()
                         .anyRequest().permitAll()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2
