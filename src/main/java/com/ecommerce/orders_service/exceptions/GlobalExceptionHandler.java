@@ -74,4 +74,14 @@ public class GlobalExceptionHandler {
                 .body(Map.of("error", ex.getMessage()));
     }
 
+    @ExceptionHandler(InvalidPaymentException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidPayment(
+            InvalidPaymentException ex) {
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("error", ex.getMessage()));
+    }
+
+
+
 }
