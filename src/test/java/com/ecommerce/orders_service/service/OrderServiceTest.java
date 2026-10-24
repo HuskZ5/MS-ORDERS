@@ -8,6 +8,7 @@ import com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.Order;
+import com.ecommerce.orders_service.model.OrderStatus;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
 import com.ecommerce.orders_service.sources.builders.CartTestDataBuilder;
@@ -356,6 +357,42 @@ class OrderServiceTest {
                 verify(productClient, never()).restoreStock(anyLong(), anyInt());
                 verify(orderRepository, never()).save(any(Order.class));
             }
+        }
+
+        @Test
+        @DisplayName("No cancela la orden cuando falla la restauración de inventario")
+        void shouldNotCancelOrderWhenStockRestorationFails() {
+
+            Order order = OrderTestDataBuilder.anOrder()
+                    .withId(1L)
+                    .withUserId(10L)
+                    .withStatus(OrderStatus.CREATED)
+                    .withTotal("200.00")
+                    .withItem(101L, 2, "100.00")
+                    .build();
+
+            CancelOrderRequest request = CancelOrderRequest.builder()
+                    .orderId(1L)
+                    .userId(10L)
+                    .build();
+
+            when(orderRepository.findById(1L))
+                    .thenReturn(Optional.of(order));
+
+            doThrow(new RuntimeException("Error al restaurar inventario"))
+                    .when(productClient)
+                    .restoreStock(101L, 2);
+
+            assertThatThrownBy(() -> orderService.cancelOrder(request))
+                    .isInstanceOf(RuntimeException.class)
+                    .hasMessage("Error al restaurar inventario");
+
+            verify(productClient).restoreStock(101L, 2);
+
+            verify(orderRepository, never()).save(any(Order.class));
+
+            assertThat(order.getStatus())
+                    .isEqualTo(OrderStatus.CREATED);
         }
     }
 }

@@ -5,6 +5,9 @@ import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.OrderService;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
@@ -126,27 +129,135 @@ public class OrderController {
     }
 
     /**
-     * HU-15: Endpoint para cancelar un pedido existente.
-     * <p>
-     * Recibe los datos de cancelación mediante el cuerpo de la petición (JSON) con {@link CancelOrderRequest}.
+     * HU-07: Cancela una orden perteneciente al usuario autenticado.
      *
-     * @param id Identificador del pedido opcionalmente proveniente de la ruta.
-     * @param request DTO {@link CancelOrderRequest} con orderId y userId.
-     * @return {@link ResponseEntity} con el {@link CancelOrderResponse} y código HTTP 200 OK.
-     * @throws UnauthorizedUserException si el userId no está presente.
+     * La identidad del usuario se obtiene del JWT y no del cuerpo JSON.
+     * Valida que la orden exista, pertenezca al usuario y se encuentre
+     * en un estado que permita su cancelación.
+     *
+     * Solicita la restauración del inventario antes de guardar
+     * el nuevo estado CANCELLED.
+     *
+     * @param id Identificador de la orden, opcional en la ruta.
+     * @param request Datos de la orden que se desea cancelar.
+     * @param authentication Identidad del usuario autenticado.
+     * @return Respuesta con los detalles de la cancelación.
      */
+
+    @Operation(
+            summary = "Cancelar una orden",
+            description = "Permite cancelar una orden que pertenece al usuario " +
+                    "autenticado mediante JWT. Valida el estado de la orden y " +
+                    "solicita la restauración del inventario de sus productos."
+    )
+    @SecurityRequirement(name = "bearerAuth")
+
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Orden cancelada correctamente"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Solicitud de cancelación inválida",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(
+                                    value = "{\"error\":\"El ID de la orden es obligatorio\"}"
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Token JWT ausente, inválido o expirado",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(
+                                    value = "{\"error\":\"Usuario no autenticado\"}"
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "El usuario no tiene autorización para cancelar esta orden",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(
+                                    value = "{\"error\":\"No tienes permiso para cancelar esta orden\"}"
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "La orden solicitada no existe",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(
+                                    value = "{\"error\":\"Orden no encontrada\"}"
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "La orden ya fue cancelada o se encuentra en un estado que impide su cancelación",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(type = "object"),
+                            examples = @ExampleObject(
+                                    value = "{\"error\":\"La orden no puede cancelarse en su estado actual\"}"
+                            )
+                    )
+            )
+    })
+
+
     @PatchMapping(value = {"/cancel", "/{id}/cancel"})
     public ResponseEntity<CancelOrderResponse> cancelOrder(
             @PathVariable(value = "id", required = false) Long id,
-            @RequestBody CancelOrderRequest request) {
+            @RequestBody CancelOrderRequest request,
+            Authentication authentication) {
 
-        if (id != null && request.getOrderId() == null) {
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "La solicitud de cancelación es obligatoria"
+            );
+        }
+
+        if (id != null) {
+            if (request.getOrderId() != null
+                    && !id.equals(request.getOrderId())) {
+                throw new IllegalArgumentException(
+                        "El ID de la URL no coincide con el ID de la solicitud"
+                );
+            }
+
             request.setOrderId(id);
         }
 
-        if (request == null || request.getUserId() == null) {
+        if (request.getOrderId() == null) {
+            throw new IllegalArgumentException(
+                    "El ID de la orden es obligatorio"
+            );
+        }
+
+        if (authentication == null || !authentication.isAuthenticated()
+                || "anonymousUser".equals(authentication.getPrincipal())) {
             throw new UnauthorizedUserException("Usuario no autenticado");
         }
+
+        Long authenticatedUserId;
+
+        try {
+            authenticatedUserId = Long.valueOf(authentication.getName());
+        } catch (NumberFormatException e) {
+            throw new UnauthorizedUserException("Identidad de usuario inválida");
+        }
+
+        request.setUserId(authenticatedUserId);
 
         CancelOrderResponse response = orderService.cancelOrder(request);
         return ResponseEntity.ok(response);
