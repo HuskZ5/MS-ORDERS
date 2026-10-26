@@ -30,6 +30,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/orders/{id}")
                         .authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/orders/{id}/payment")
+                        .authenticated()
                         .requestMatchers(
                                 HttpMethod.PATCH,
                                 "/api/orders/{id}/cancel",
