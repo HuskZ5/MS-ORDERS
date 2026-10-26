@@ -18,6 +18,12 @@ parser.add_argument(
     "--minutes", type=int, default=60,
     help="Duración del token en minutos"
 )
+parser.add_argument(
+    "--role",
+    choices=["USER", "ADMIN"],
+    default="USER",
+    help="Rol del usuario para pruebas locales"
+)
 args = parser.parse_args()
 
 if args.user_id <= 0 or args.minutes <= 0:
@@ -40,6 +46,7 @@ now = datetime.now(timezone.utc)
 
 payload = {
     "sub": str(args.user_id),
+    "roles": [args.role],
     "iss": "rally-java-dev",
     "iat": now,
     "exp": now + timedelta(minutes=args.minutes),
