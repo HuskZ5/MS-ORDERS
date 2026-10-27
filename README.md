@@ -136,8 +136,8 @@ Coupon
 | `PATCH` | `/api/orders/{id}/shipping` |
 
 # 📚 Swagger / OpenAPI
-http://localhost:8080/swagger-ui/index.html`
-`
+http://localhost:8080/swagger-ui/index.html
+
 # 🧪 Testing
 ```
 test
