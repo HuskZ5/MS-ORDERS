@@ -122,7 +122,7 @@ class CancelOrderSecurityTest {
                                 .content("{\"orderId\":1,\"userId\":10}")
                 )
                 .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.error").value(
+                .andExpect(jsonPath("$.message").value(
                         "El usuario con id 20 no tiene autorización para cancelar este pedido"
                 ));
 
@@ -160,7 +160,7 @@ class CancelOrderSecurityTest {
                                 .content("{}")
                 )
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value(
+                .andExpect(jsonPath("$.message").value(
                         "El ID de la orden es obligatorio"
                 ));
 
@@ -178,7 +178,7 @@ class CancelOrderSecurityTest {
                                 .content("{\"orderId\":1}")
                 )
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error").value(
+                .andExpect(jsonPath("$.message").value(
                         "Identidad de usuario inválida"
                 ));
 

@@ -80,7 +80,7 @@ class CartControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(jsonPayload))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 CartResponse response = CartTestDataBuilder.buildCartResponse(scenario);
                 when(cartService.addItemToCart(any(AddToCartRequest.class))).thenReturn(response);
@@ -117,7 +117,7 @@ class CartControllerTest {
 
                 mockMvc.perform(get("/api/carts/{userId}", scenario.userId()))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 CartResponse response = CartTestDataBuilder.buildCartResponse(scenario);
                 when(cartService.getCarByAuthenticatedUser(scenario.userId())).thenReturn(response);
@@ -162,7 +162,7 @@ class CartControllerTest {
             if (scenario.expectedErrorMessage() != null && !scenario.expectedErrorMessage().isBlank()) {
                 mockMvc.perform(requestBuilder)
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 mockMvc.perform(requestBuilder)
                         .andExpect(status().is(scenario.expectedHttpStatus()))
@@ -199,7 +199,7 @@ class CartControllerTest {
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(jsonPayload))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 CartResponse response = CartTestDataBuilder.buildCartResponse(scenario);
                 doNothing().when(couponService).applyCoupon(scenario.userId(), scenario.couponCode());

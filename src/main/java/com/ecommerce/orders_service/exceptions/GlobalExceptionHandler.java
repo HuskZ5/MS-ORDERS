@@ -86,9 +86,10 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(InvalidCouponException.class)
-    public ResponseEntity<Map<String, String>> handleInvalidCoupon(InvalidCouponException ex) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(Map.of("error", ex.getMessage()));
+    public ResponseEntity<ErrorResponse> handleInvalidCoupon(
+            InvalidCouponException ex,
+            HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_COUPON", request);
     }
 
     @ExceptionHandler(InvalidPaymentException.class)

@@ -122,7 +122,7 @@ class PaymentControllerTest {
                                 .content("{\"operationId\":\"payment-001\"}")
                 )
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error")
+                .andExpect(jsonPath("$.message")
                         .value("Usuario no autenticado"));
 
         verifyNoInteractions(paymentService);
@@ -147,7 +147,7 @@ class PaymentControllerTest {
                                 .content("{\"operationId\":\"payment-002\"}")
                 )
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.error")
+                .andExpect(jsonPath("$.message")
                         .value("No se pudo identificar al usuario autenticado"));
 
         verifyNoInteractions(paymentService);
