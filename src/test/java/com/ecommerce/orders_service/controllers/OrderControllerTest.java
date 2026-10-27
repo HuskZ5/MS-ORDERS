@@ -76,7 +76,7 @@ class OrderControllerTest {
 
                 mockMvc.perform(get("/api/orders"))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 List<OrderResponse> responses = OrderTestDataBuilder.buildOrderResponseList(scenario);
                 when(orderService.getAllOrders()).thenReturn(responses);
@@ -111,7 +111,7 @@ class OrderControllerTest {
 
                 mockMvc.perform(get("/api/orders/today"))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 List<OrderResponse> responses = OrderTestDataBuilder.buildOrderResponseList(scenario);
                 when(orderService.getTodayOrders()).thenReturn(responses);
@@ -153,7 +153,7 @@ class OrderControllerTest {
 
                 mockMvc.perform(get("/api/orders/{id}", scenario.orderId()).principal(authentication))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 OrderResponse response = OrderTestDataBuilder.buildOrderResponse(scenario);
                 when(orderService.getOrderById(scenario.orderId(), scenario.userId())).thenReturn(response);
@@ -176,7 +176,7 @@ class OrderControllerTest {
 
             mockMvc.perform(get("/api/orders/{id}", 15L))
                     .andExpect(status().isUnauthorized())
-                    .andExpect(jsonPath("$.error")
+                    .andExpect(jsonPath("$.message")
                             .value("Usuario no autenticado"));
 
             verifyNoInteractions(orderService);
@@ -206,7 +206,7 @@ class OrderControllerTest {
                                     .principal(authentication)
                     )
                     .andExpect(status().isForbidden())
-                    .andExpect(jsonPath("$.error")
+                    .andExpect(jsonPath("$.message")
                             .value("No tienes autorización para consultar esta orden"));
         }
     }
@@ -229,7 +229,7 @@ class OrderControllerTest {
                 mockMvc.perform(post("/api/orders")
                                 .param("userId", String.valueOf(scenario.userId())))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 OrderResponse response = OrderTestDataBuilder.buildOrderResponse(scenario);
                 when(orderService.createOrderFromCart(scenario.userId())).thenReturn(response);
@@ -293,7 +293,7 @@ class OrderControllerTest {
             if (scenario.expectedErrorMessage() != null && !scenario.expectedErrorMessage().isBlank()) {
                 mockMvc.perform(requestBuilder)
                         .andExpect(status().is(scenario.expectedHttpStatus()))
-                        .andExpect(jsonPath("$.error").value(scenario.expectedErrorMessage()));
+                        .andExpect(jsonPath("$.message").value(scenario.expectedErrorMessage()));
             } else {
                 Long expectedOrderId = scenario.orderId() != null ? scenario.orderId() : scenario.pathId();
                 mockMvc.perform(requestBuilder)
