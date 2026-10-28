@@ -1,218 +1,134 @@
 package com.ecommerce.orders_service.exceptions;
 
-import com.ecommerce.orders_service.dto.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-import java.time.Instant;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<ApiErrorResponse> handleValidationExceptions(
-            MethodArgumentNotValidException ex,
+    private ResponseEntity<ErrorResponse> buildResponse(
+            Exception ex,
+            HttpStatus status,
+            String code,
             HttpServletRequest request) {
+        ErrorResponse error = new ErrorResponse(
+                status.value(),
+                code,
+                ex.getMessage(),
+                request.getRequestURI());
 
-        String validationMessage = ex.getBindingResult().getFieldErrors().stream()
-                .map(FieldError::getDefaultMessage)
-                .collect(Collectors.joining("; "));
-
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "VALIDATION_ERROR",
-                validationMessage,
-                request.getRequestURI()
-        );
+        return ResponseEntity.status(status).body(error);
     }
 
     @ExceptionHandler(CartEmptyException.class)
-    public ResponseEntity<ApiErrorResponse> handleCartEmpty(
-            CartEmptyException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "CART_EMPTY",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleCartEmpty(CartEmptyException ex, HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "CART_EMPTY", request);
     }
 
     @ExceptionHandler(ProductOutOfStockException.class)
-    public ResponseEntity<ApiErrorResponse> handleOutOfStock(
-            ProductOutOfStockException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.CONFLICT,
-                "PRODUCT_OUT_OF_STOCK",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleOutOfStock(ProductOutOfStockException ex, HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.CONFLICT, "PRODUCT_OUT_OF_STOCK", request);
     }
 
     @ExceptionHandler(OrderNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleOrderNotFound(
-            OrderNotFoundException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                "ORDER_NOT_FOUND",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleOrderNotFound(OrderNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.NOT_FOUND, "ORDER_NOT_FOUND", request);
     }
 
     @ExceptionHandler(UnauthorizedOrderAccessException.class)
-    public ResponseEntity<ApiErrorResponse> handleUnauthorized(
-            UnauthorizedOrderAccessException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.FORBIDDEN,
-                "FORBIDDEN_ORDER_ACCESS",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedOrderAccessException ex,
+                                                            HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.FORBIDDEN, "UNAUTHORIZER_ORDER_ACCESS", request);
     }
 
     @ExceptionHandler(CartNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleCartNotFound(
-            CartNotFoundException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                "CART_NOT_FOUND",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleCartNotFound(CartNotFoundException ex, HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.NOT_FOUND, "CART_NOT_FOUND", request);
     }
 
     @ExceptionHandler(InvalidCartOperationException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidCart(
-            InvalidCartOperationException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "INVALID_CART_OPERATION",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleInvalidCart(InvalidCartOperationException ex,
+                                                           HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_CART_OPERATION", request);
     }
 
     @ExceptionHandler(InvalidOrderStateException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidOrderState(
-            InvalidOrderStateException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.CONFLICT,
-                "INVALID_ORDER_STATE",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleInvalidOrderState(InvalidOrderStateException ex,
+                                                                 HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.CONFLICT, "INVALID_ORDER_STATE", request);
     }
 
     @ExceptionHandler(UnauthorizedUserException.class)
-    public ResponseEntity<ApiErrorResponse> handleUnauthorizedUser(
-            UnauthorizedUserException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.UNAUTHORIZED,
-                "UNAUTHORIZED_USER",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleUnauthorizedUser(UnauthorizedUserException ex,
+                                                                HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.UNAUTHORIZED, "UNAUTHORIZED_USER_EXCEPTION", request);
     }
 
     @ExceptionHandler(ProductNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleProductNotFound(
-            ProductNotFoundException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                "PRODUCT_NOT_FOUND",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleProductNotFound(ProductNotFoundException ex,
+                                                               HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", request);
     }
 
     @ExceptionHandler(BusinessOperationException.class)
-    public ResponseEntity<ApiErrorResponse> handleBusinessException(
-            BusinessOperationException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "BUSINESS_RULE_VIOLATION",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleBusinessException(BusinessOperationException ex,
+                                                                 HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "BUSINESS_OPERATION_ERROR", request);
     }
 
     @ExceptionHandler(CouponNotFoundException.class)
-    public ResponseEntity<ApiErrorResponse> handleCouponNotFound(
-            CouponNotFoundException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.NOT_FOUND,
-                "COUPON_NOT_FOUND",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleCouponNotFound(CouponNotFoundException ex,
+                                                              HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.NOT_FOUND, "COUPON_NOT_FOUND", request);
     }
 
     @ExceptionHandler(InvalidCouponException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidCoupon(
+    public ResponseEntity<ErrorResponse> handleInvalidCoupon(
             InvalidCouponException ex,
             HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "INVALID_COUPON",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_COUPON", request);
     }
 
     @ExceptionHandler(InvalidPaymentException.class)
-    public ResponseEntity<ApiErrorResponse> handleInvalidPayment(
-            InvalidPaymentException ex,
-            HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "INVALID_PAYMENT",
-                ex.getMessage(),
-                request.getRequestURI()
-        );
+    public ResponseEntity<ErrorResponse> handleInvalidPayment(
+            InvalidPaymentException ex, HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_PAYMENT", request);
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
-            IllegalArgumentException ex,
+    public ResponseEntity<ErrorResponse> handleIllegalArgument(
+            IllegalArgumentException ex, HttpServletRequest request) {
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "ILLEGAL_ARGUMENT", request);
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationErrors(
+            MethodArgumentNotValidException ex,
             HttpServletRequest request) {
-        return buildErrorResponse(
-                HttpStatus.BAD_REQUEST,
-                "INVALID_ARGUMENT",
-                ex.getMessage(),
+
+        String message = ex.getBindingResult()
+                .getFieldErrors()
+                .stream()
+                .map(error -> error.getDefaultMessage())
+                .distinct()
+                .collect(Collectors.joining("; "));
+
+        ErrorResponse error = new ErrorResponse(
+                400,
+                "VALIDATION_ERROR",
+                message,
                 request.getRequestURI()
         );
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(error);
     }
 
-    private ResponseEntity<ApiErrorResponse> buildErrorResponse(
-            HttpStatus status,
-            String code,
-            String message,
-            String path) {
-
-        ApiErrorResponse errorResponse = new ApiErrorResponse(
-                Instant.now(),
-                status.value(),
-                code,
-                message,
-                path
-        );
-        return ResponseEntity.status(status).body(errorResponse);
-    }
 }

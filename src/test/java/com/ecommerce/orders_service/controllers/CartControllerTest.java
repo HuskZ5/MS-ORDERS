@@ -83,7 +83,8 @@ class CartControllerTest {
                         .newInstance(scenario.expectedErrorMessage());
                 when(cartService.addItemToCart(any(AddToCartRequest.class))).thenThrow(ex);
 
-                mockMvc.perform(post("/api/v1/cart/items")
+                mockMvc.perform(post("/api/carts/items")
+                                .header("X-USER-ID", 1L)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(jsonPayload))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
@@ -92,7 +93,8 @@ class CartControllerTest {
                 CartResponse response = CartTestDataBuilder.buildCartResponse(scenario);
                 when(cartService.addItemToCart(any(AddToCartRequest.class))).thenReturn(response);
 
-                mockMvc.perform(post("/api/v1/cart/items")
+                mockMvc.perform(post("/api/carts/items")
+                                .header("X-USER-ID", 1L)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(jsonPayload))
                         .andExpect(status().is(scenario.expectedHttpStatus()))

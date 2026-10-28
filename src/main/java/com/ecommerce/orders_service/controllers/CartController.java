@@ -1,10 +1,10 @@
 package com.ecommerce.orders_service.controllers;
 
 import com.ecommerce.orders_service.dto.AddToCartRequest;
-import com.ecommerce.orders_service.dto.ApiErrorResponse;
 import com.ecommerce.orders_service.dto.ApplyCouponRequest;
 import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.dto.UpdateCartItemQuantityRequest;
+import com.ecommerce.orders_service.exceptions.ErrorResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.CartService;
 import com.ecommerce.orders_service.service.CouponService;
@@ -28,8 +28,15 @@ public class CartController {
 
     @PostMapping("/items")
     public ResponseEntity<CartResponse> addProductToCart(
+            @RequestHeader(value = "X-USER-ID", required = false) Long userId,
             @Valid @RequestBody AddToCartRequest request) {
 
+        if (userId == null) {
+            throw new UnauthorizedUserException(
+                    "Usuario no autenticado");
+        }
+
+        request.setUserId(userId);
         CartResponse response = cartService.addItemToCart(request);
 
         return ResponseEntity.ok(response);
@@ -54,7 +61,7 @@ public class CartController {
                     description = "Cantidad inválida (fuera del rango 1 a 5) o el carrito supera el monto máximo permitido",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -62,7 +69,7 @@ public class CartController {
                     description = "El ítem especificado no existe en el carrito o el producto no fue encontrado en el catálogo",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -70,7 +77,7 @@ public class CartController {
                     description = "Stock insuficiente en el inventario para cubrir la nueva cantidad solicitada",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             )
     })
@@ -99,7 +106,7 @@ public class CartController {
                     description = "El ítem solicitado no fue encontrado en ningún carrito activo",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             )
     })

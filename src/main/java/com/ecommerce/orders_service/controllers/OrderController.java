@@ -1,9 +1,9 @@
 package com.ecommerce.orders_service.controllers;
 
-import com.ecommerce.orders_service.dto.ApiErrorResponse;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.exceptions.ErrorResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.OrderService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -132,7 +132,7 @@ public class OrderController {
                     description = "El carrito se encuentra vacío o los cupones aplicados son inválidos",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -140,7 +140,7 @@ public class OrderController {
                     description = "El carrito del usuario o alguno de los productos no existe",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             ),
             @ApiResponse(
@@ -148,7 +148,7 @@ public class OrderController {
                     description = "Stock insuficiente en el inventario para cubrir la cantidad solicitada",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = ApiErrorResponse.class)
+                            schema = @Schema(implementation = ErrorResponse.class)
                     )
             )
     })
