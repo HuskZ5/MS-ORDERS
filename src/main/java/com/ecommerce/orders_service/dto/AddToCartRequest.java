@@ -1,18 +1,26 @@
 package com.ecommerce.orders_service.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-//import java.math.BigDecimal;
 @AllArgsConstructor
 @NoArgsConstructor
 @Getter
 @Setter
 public class AddToCartRequest {
     private Long userId;
+    @NotNull(message = "El Id del producto es obligatorio")
+    @Positive(message = "El id del producto debe ser mayor a cero")
     private Long productId;
+    @NotNull(message = "La cantidad es obligatoria")
+    @Min(value = 1, message = "La cantidad mínima es 1")
+    @Max(value = 5, message = "La cantidad máxima es 5")
     private Integer quantity;
     //private BigDecimal price;
 
