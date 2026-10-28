@@ -1,96 +1,33 @@
 package com.ecommerce.orders_service.client;
 
 import com.ecommerce.orders_service.dto.ProductResponse;
-import com.ecommerce.orders_service.exceptions.ProductNotFoundException;
-import com.ecommerce.orders_service.dto.ReduceStockRequest;
-import com.ecommerce.orders_service.exceptions.ProductOutOfStockException;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-import org.springframework.http.MediaType;
 
-@Component
-public class ProductClient {
+/**
+ * Contrato de cliente para la comunicación con el microservicio de catálogo de productos (MS-Productos).
+ */
+public interface ProductClient {
 
-    private final RestClient restClient;
+    /**
+     * Consulta el detalle y stock disponible de un producto por su identificador.
+     *
+     * @param productId Identificador único del producto.
+     * @return {@link ProductResponse} con la información del producto.
+     */
+    ProductResponse getProductById(Long productId);
 
-    public ProductClient(
-            @Value("${products.service.url}") String productsServiceUrl) {
+    /**
+     * Descuenta unidades del inventario de un producto al confirmar una orden.
+     *
+     * @param productId Identificador único del producto.
+     * @param quantity  Cantidad de unidades a descontar.
+     */
+    void reduceStock(Long productId, Integer quantity);
 
-        this.restClient = RestClient.builder()
-                .baseUrl(productsServiceUrl)
-                .build();
-    }
-
-    public ProductResponse getProductById(Long productId) {
-        try {
-            return restClient.get()
-                    .uri("/api/products/{id}", productId)
-                    .retrieve()
-                    .body(ProductResponse.class);
-
-        } catch (HttpClientErrorException.NotFound ex) {
-            throw new ProductNotFoundException(
-                    "Producto no encontrado con id: " + productId
-            );
-        }
-    }
-
-
-    public void reduceStock(Long productId, Integer quantity) {
-
-        if (productId == null || productId <= 0) {
-            throw new IllegalArgumentException(
-                    "El ID del producto debe ser valido"
-            );
-        }
-
-        if (quantity == null || quantity <= 0) {
-            throw new IllegalArgumentException(
-                    "La cantidad debe ser mayor a cero"
-            );
-        }
-
-        try {
-            restClient.patch()
-                    .uri("/api/products/{id}/stock", productId)
-                    //MOCK POSTMAN: Descomentar para simular un error 409 Conflict
-                    //.header("x-mock-response-name", "Stock Insuficiente")
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .body(new ReduceStockRequest(quantity))
-                    .retrieve()
-                    .toBodilessEntity();
-
-        } catch (HttpClientErrorException.Conflict ex) {
-            throw new ProductOutOfStockException(
-                    "Stock insuficiente para el producto " + productId
-            );
-        }
-    }
-
-
-    public void restoreStock(Long productId, Integer quantity) {
-
-        if (productId == null || productId <= 0) {
-            throw new IllegalArgumentException(
-                    "El ID del producto debe ser válido"
-            );
-        }
-
-        if (quantity == null || quantity <= 0) {
-            throw new IllegalArgumentException(
-                    "La cantidad debe ser mayor a cero"
-            );
-        }
-
-        restClient.patch()
-                .uri("/api/products/{id}/stock/restore", productId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(new ReduceStockRequest(quantity))
-                .retrieve()
-                .toBodilessEntity();
-    }
-
-
+    /**
+     * Restaura unidades al inventario de un producto al cancelar una orden.
+     *
+     * @param productId Identificador único del producto.
+     * @param quantity  Cantidad de unidades a restaurar.
+     */
+    void restoreStock(Long productId, Integer quantity);
 }

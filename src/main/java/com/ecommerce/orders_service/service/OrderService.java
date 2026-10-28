@@ -1,12 +1,13 @@
 package com.ecommerce.orders_service.service;
 
+import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.ItemReturned;
 import com.ecommerce.orders_service.dto.OrderItemDto;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.dto.ProductResponse;
 import com.ecommerce.orders_service.exceptions.*;
-import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.model.Order;
@@ -14,15 +15,11 @@ import com.ecommerce.orders_service.model.OrderItem;
 import com.ecommerce.orders_service.model.OrderStatus;
 import com.ecommerce.orders_service.repository.CartRepository;
 import com.ecommerce.orders_service.repository.OrderRepository;
-import com.ecommerce.orders_service.client.ProductClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
-
-
-
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -47,27 +44,15 @@ public class OrderService {
         this.couponService = couponService;
     }
 
-    /**
-     * Obtiene todas las órdenes de compra registradas en el sistema.
-     * Consulta las órdenes mediante el repositorio y convierte cada entidad
-     * Order en un objeto OrderResponse.
-     * Si no existen órdenes disponibles, lanza una excepción.
-     *
-     * @return Lista de {@link OrderResponse} con los datos de las órdenes registradas.
-     * @throws OrderNotFoundException si no existen órdenes disponibles.
-     */
     @Transactional(readOnly = true)
-    public List<OrderResponse> getAllOrders(){
+    public List<OrderResponse> getAllOrders() {
         List<Order> orders = orderRepository.findAll();
         if (orders.isEmpty()) throw new OrderNotFoundException("No hay ordenes disponibles");
         return orders.stream().map(this::mapToOrderResponse).toList();
     }
 
-
-
     @Transactional(readOnly = true)
     public List<OrderResponse> getTodayOrders() {
-
         LocalDateTime start = LocalDate.now().atStartOfDay();
         LocalDateTime end = start.plusDays(1);
 
@@ -84,11 +69,10 @@ public class OrderService {
                 .toList();
     }
 
-
-
     /**
      * HU-03: Convierte el carrito activo de un usuario en una orden de compra.
-     * Realiza la reducción de stock mediante el cliente de productos y vacía el carrito.
+     * Valida la disponibilidad de stock y obtiene el precio vigente desde {@link ProductClient}
+     * para cada producto antes de reducir el inventario y persistir la copia histórica en {@link OrderItem}.
      *
      * @param userId Identificador único del usuario dueño del carrito.
      * @return {@link OrderResponse} con los datos de la orden creada.
@@ -99,7 +83,7 @@ public class OrderService {
         Cart cart = cartRepository.findByUserId(userId)
                 .orElseThrow(() -> new CartNotFoundException("Carrito no encontrado para el usuario id: " + userId));
 
-        // 2. Valida que no este vacio
+        // 2. Valida que no esté vacío
         if (cart.getItems() == null || cart.getItems().isEmpty()) {
             throw new CartEmptyException("El carrito del usuario " + userId + " está vacío");
         }
@@ -110,18 +94,28 @@ public class OrderService {
         order.setStatus(OrderStatus.CREATED);
         order.setCreatedAt(LocalDateTime.now());
 
-        // 4. Stop precios y calcula total acumulado
+        // 4. Consulta ProductClient por cada ítem, valida stock disponible y congela el precio vigente
         List<OrderItem> orderItems = new ArrayList<>();
         BigDecimal totalCalculado = BigDecimal.ZERO;
 
         for (CartItem cartItem : cart.getItems()) {
+            ProductResponse currentProduct = productClient.getProductById(cartItem.getProductId());
+
+            if (currentProduct.getStock() != null && currentProduct.getStock() < cartItem.getQuantity()) {
+                throw new ProductOutOfStockException(
+                        "Stock insuficiente para el producto " + cartItem.getProductId()
+                );
+            }
+
+            BigDecimal currentUnitPrice = currentProduct.getPrice();
+
             OrderItem orderItem = new OrderItem();
             orderItem.setOrder(order);
             orderItem.setProductId(cartItem.getProductId());
             orderItem.setQuantity(cartItem.getQuantity());
-            orderItem.setUnitPrice(cartItem.getPrice());
+            orderItem.setUnitPrice(currentUnitPrice);
 
-            BigDecimal subtotal = cartItem.getPrice().multiply(BigDecimal.valueOf(cartItem.getQuantity()));
+            BigDecimal subtotal = currentUnitPrice.multiply(BigDecimal.valueOf(cartItem.getQuantity()));
             totalCalculado = totalCalculado.add(subtotal);
 
             orderItems.add(orderItem);
@@ -141,11 +135,12 @@ public class OrderService {
         order.setItems(orderItems);
         order.setTotal(totalFinal);
 
+        // 5. Descuenta stock en el microservicio de productos tras validar todos los ítems
         for (CartItem cartItem : cart.getItems()) {
             productClient.reduceStock(cartItem.getProductId(), cartItem.getQuantity());
         }
 
-        // 5. Guarda la orden y congela los registros
+        // 6. Guarda la orden y congela los registros históricos
         Order savedOrder = orderRepository.save(order);
 
         couponService.registerCouponUsages(
@@ -154,21 +149,14 @@ public class OrderService {
                 userId
         );
 
-        // 6. Vacia el carrito activo
+        // 7. Vacía el carrito activo
         cart.getItems().clear();
         cartRepository.save(cart);
 
-        // 7. Retorna el dto
+        // 8. Retorna el DTO
         return mapToOrderResponse(savedOrder);
     }
 
-    /**
-     * Obtener los detalles de una orden por su ID (HU-14 / GET Order).
-     *
-     * @param id Identificador único de la orden.
-     * @return {@link OrderResponse} con el detalle de la orden.
-     * @throws OrderNotFoundException si la orden no existe.
-     */
     @Transactional(readOnly = true)
     public OrderResponse getOrderById(Long id, Long authenticatedUserId) {
         if (authenticatedUserId == null) {
@@ -191,30 +179,18 @@ public class OrderService {
         return mapToOrderResponse(order);
     }
 
-    /**
-     * HU-15: Cancela un pedido existente previa validación de existencia, autorización y estado permitido.
-     *
-     * @param request DTO {@link CancelOrderRequest} con los datos del pedido y usuario solicitante.
-     * @return {@link CancelOrderResponse} con el resultado detallado de la cancelación y monto reembolsado.
-     * @throws OrderNotFoundException si el pedido no existe.
-     * @throws UnauthorizedOrderAccessException si el usuario no tiene permisos para cancelar este pedido.
-     * @throws InvalidOrderStateException si el pedido no se encuentra en un estado cancelable.
-     */
     @Transactional
     public CancelOrderResponse cancelOrder(CancelOrderRequest request) {
         Long orderId = request.getOrderId();
         Long userId = request.getUserId();
 
-        // 1. Verificar existencia del pedido
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new OrderNotFoundException("Pedido no encontrado con id: " + orderId));
 
-        // 2. Validar autorización de usuario (pertenencia)
         if (!order.getUserId().equals(userId)) {
             throw new UnauthorizedOrderAccessException("El usuario con id " + userId + " no tiene autorización para cancelar este pedido");
         }
 
-        // 3. Validar estado permitido
         OrderStatus currentStatus = order.getStatus();
         if (currentStatus == OrderStatus.CANCELLED) {
             throw new InvalidOrderStateException("El pedido con id " + orderId + " ya se encuentra cancelado");
@@ -224,8 +200,6 @@ public class OrderService {
             throw new InvalidOrderStateException("No es posible cancelar el pedido con id " + orderId + " porque se encuentra en estado: " + currentStatus);
         }
 
-
-        // 4. Devolver al inventario los productos de la orden
         for (OrderItem item : order.getItems()) {
             productClient.restoreStock(
                     item.getProductId(),
@@ -233,18 +207,15 @@ public class OrderService {
             );
         }
 
-        // 5. Cambiar estado a CANCELLED y persistir
         order.setStatus(OrderStatus.CANCELLED);
         order.setCancelledAt(LocalDateTime.now());
         Order updatedOrder = orderRepository.save(order);
 
-        // 6. Mapear items devueltos
         List<ItemReturned> itemsReturned = updatedOrder.getItems() != null ?
                 updatedOrder.getItems().stream()
                         .map(item -> new ItemReturned(item.getProductId(), item.getQuantity()))
                         .collect(Collectors.toList()) : new ArrayList<>();
 
-        // 7. Retornar DTO de cancelación
         return CancelOrderResponse.builder()
                 .orderId(updatedOrder.getId())
                 .userId(updatedOrder.getUserId())
@@ -255,12 +226,6 @@ public class OrderService {
                 .build();
     }
 
-    /**
-     * Mapear la entidad Order a OrderResponse DTO.
-     *
-     * @param order Entidad {@link Order} a transformar.
-     * @return Instancia de {@link OrderResponse} con los datos estructurados.
-     */
     public OrderResponse mapToOrderResponse(Order order) {
         List<OrderItemDto> itemDtos = order.getItems() != null ?
                 order.getItems().stream()

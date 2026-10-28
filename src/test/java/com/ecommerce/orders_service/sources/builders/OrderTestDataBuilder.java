@@ -5,6 +5,7 @@ import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.ItemReturned;
 import com.ecommerce.orders_service.dto.OrderItemDto;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.dto.ProductResponse;
 import com.ecommerce.orders_service.model.Order;
 import com.ecommerce.orders_service.model.OrderItem;
 import com.ecommerce.orders_service.model.OrderStatus;
@@ -14,6 +15,7 @@ import com.ecommerce.orders_service.sources.scenarios.order.ControllerCreateOrde
 import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetAllOrdersScenario;
 import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetOrderScenario;
 import com.ecommerce.orders_service.sources.scenarios.order.ControllerGetTodayOrdersScenario;
+import com.ecommerce.orders_service.sources.scenarios.order.CreateOrderScenario;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -95,6 +97,13 @@ public class OrderTestDataBuilder {
         }
         order.setItems(new ArrayList<>(this.items));
         return order;
+    }
+
+    public static ProductResponse buildProductResponse(CreateOrderScenario scenario) {
+        ProductResponse response = new ProductResponse();
+        response.setPrice(new BigDecimal(scenario.catalogPrice()));
+        response.setStock(scenario.catalogStock());
+        return response;
     }
 
     public static List<OrderResponse> buildOrderResponseList(ControllerGetAllOrdersScenario scenario) {

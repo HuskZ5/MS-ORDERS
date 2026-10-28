@@ -3,23 +3,22 @@ package com.ecommerce.orders_service.controllers;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.exceptions.ErrorResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.OrderService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import io.swagger.v3.oas.annotations.security.SecurityScheme;
 
 import java.util.List;
 
@@ -28,7 +27,7 @@ import java.util.List;
  * Expone endpoints para la creación, consulta y cancelación de pedidos.
  */
 @RestController
-@RequestMapping("/api/orders")
+@RequestMapping({"/api/v1/orders", "/api/orders"})
 @SecurityScheme(
         name = "bearerAuth",
         type = io.swagger.v3.oas.annotations.enums.SecuritySchemeType.HTTP,
@@ -45,19 +44,14 @@ public class OrderController {
     }
 
     @GetMapping
-    public ResponseEntity<List<OrderResponse>> getAll(){
+    public ResponseEntity<List<OrderResponse>> getAll() {
         return ResponseEntity.ok(orderService.getAllOrders());
     }
-
 
     @GetMapping("/today")
     public ResponseEntity<List<OrderResponse>> getTodayOrders() {
         return ResponseEntity.ok(orderService.getTodayOrders());
     }
-
-
-
-
 
     /**
      * HU-14: Endpoint para obtener los detalles de un pedido por su identificador único.
@@ -65,7 +59,6 @@ public class OrderController {
      * @param id Identificador único del pedido a consultar.
      * @return {@link ResponseEntity} con el {@link OrderResponse} correspondiente.
      */
-
     @Operation(
             summary = "Consultar una orden por ID",
             description = "Permite consultar una orden únicamente si pertenece al usuario autenticado mediante JWT."
@@ -89,7 +82,6 @@ public class OrderController {
                     description = "La orden solicitada no existe"
             )
     })
-
     @GetMapping("/{id}")
     public ResponseEntity<OrderResponse> getOrderById(
             @PathVariable Long id,
@@ -122,27 +114,49 @@ public class OrderController {
      * @param userId Identificador único del usuario dueño del carrito.
      * @return {@link ResponseEntity} con el {@link OrderResponse} creado y estado HTTP 201 Created.
      */
+    @Operation(
+            summary = "Crear una orden de compra desde el carrito activo",
+            description = "Valida la existencia del carrito, consulta el catálogo de productos en tiempo real para verificar stock disponible y congelar precios vigentes en BigDecimal, aplica descuentos de cupones, deduce el inventario y genera el registro histórico de la orden."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "201",
+                    description = "Orden creada exitosamente",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = OrderResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "El carrito se encuentra vacío o los cupones aplicados son inválidos",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "El carrito del usuario o alguno de los productos no existe",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Stock insuficiente en el inventario para cubrir la cantidad solicitada",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class)
+                    )
+            )
+    })
     @PostMapping
     public ResponseEntity<OrderResponse> createOrder(@RequestParam Long userId) {
         OrderResponse response = orderService.createOrderFromCart(userId);
         return new ResponseEntity<>(response, HttpStatus.CREATED);
     }
-
-    /**
-     * HU-07: Cancela una orden perteneciente al usuario autenticado.
-     *
-     * La identidad del usuario se obtiene del JWT y no del cuerpo JSON.
-     * Valida que la orden exista, pertenezca al usuario y se encuentre
-     * en un estado que permita su cancelación.
-     *
-     * Solicita la restauración del inventario antes de guardar
-     * el nuevo estado CANCELLED.
-     *
-     * @param id Identificador de la orden, opcional en la ruta.
-     * @param request Datos de la orden que se desea cancelar.
-     * @param authentication Identidad del usuario autenticado.
-     * @return Respuesta con los detalles de la cancelación.
-     */
 
     @Operation(
             summary = "Cancelar una orden",
@@ -151,7 +165,6 @@ public class OrderController {
                     "solicita la restauración del inventario de sus productos."
     )
     @SecurityRequirement(name = "bearerAuth")
-
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
@@ -213,8 +226,6 @@ public class OrderController {
                     )
             )
     })
-
-
     @PatchMapping(value = {"/cancel", "/{id}/cancel"})
     public ResponseEntity<CancelOrderResponse> cancelOrder(
             @PathVariable(value = "id", required = false) Long id,

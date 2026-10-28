@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -15,7 +16,7 @@ public class GlobalExceptionHandler {
             Exception ex,
             HttpStatus status,
             String code,
-            HttpServletRequest request){
+            HttpServletRequest request) {
         ErrorResponse error = new ErrorResponse(
                 status.value(),
                 code,
@@ -27,7 +28,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(CartEmptyException.class)
     public ResponseEntity<ErrorResponse> handleCartEmpty(CartEmptyException ex, HttpServletRequest request) {
-        return buildResponse(ex, HttpStatus.BAD_REQUEST,"CART_EMPTY", request);
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "CART_EMPTY", request);
     }
 
     @ExceptionHandler(ProductOutOfStockException.class)
@@ -56,9 +57,10 @@ public class GlobalExceptionHandler {
                                                            HttpServletRequest request) {
         return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_CART_OPERATION", request);
     }
+
     @ExceptionHandler(InvalidOrderStateException.class)
     public ResponseEntity<ErrorResponse> handleInvalidOrderState(InvalidOrderStateException ex,
-                                                                       HttpServletRequest request) {
+                                                                 HttpServletRequest request) {
         return buildResponse(ex, HttpStatus.CONFLICT, "INVALID_ORDER_STATE", request);
     }
 
@@ -73,9 +75,10 @@ public class GlobalExceptionHandler {
                                                                HttpServletRequest request) {
         return buildResponse(ex, HttpStatus.NOT_FOUND, "PRODUCT_NOT_FOUND", request);
     }
+
     @ExceptionHandler(BusinessOperationException.class)
     public ResponseEntity<ErrorResponse> handleBusinessException(BusinessOperationException ex,
-    HttpServletRequest request){
+                                                                 HttpServletRequest request) {
         return buildResponse(ex, HttpStatus.BAD_REQUEST, "BUSINESS_OPERATION_ERROR", request);
     }
 
@@ -95,16 +98,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InvalidPaymentException.class)
     public ResponseEntity<ErrorResponse> handleInvalidPayment(
             InvalidPaymentException ex, HttpServletRequest request) {
-      return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_PAYMENT", request);
-    
+        return buildResponse(ex, HttpStatus.BAD_REQUEST, "INVALID_PAYMENT", request);
     }
-      
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(
             IllegalArgumentException ex, HttpServletRequest request) {
         return buildResponse(ex, HttpStatus.BAD_REQUEST, "ILLEGAL_ARGUMENT", request);
     }
-
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationErrors(
@@ -129,6 +130,5 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.BAD_REQUEST)
                 .body(error);
     }
-
 
 }

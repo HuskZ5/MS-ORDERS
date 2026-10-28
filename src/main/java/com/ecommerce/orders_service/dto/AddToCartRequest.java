@@ -20,7 +20,16 @@ public class AddToCartRequest {
     @NotNull(message = "La cantidad es obligatoria")
     @Min(value = 1, message = "La cantidad solicitada debe ser mayor a cero")
     private Integer quantity;
-    //private BigDecimal price;
 
-    // Getters y Setters
+    public Long userId() {
+        return userId;
+    }
+
+    public Long productId() {
+        return productId;
+    }
+
+    public Integer quantity() {
+        return quantity;
+    }
 }

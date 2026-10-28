@@ -13,16 +13,19 @@ import com.ecommerce.orders_service.sources.scenarios.cart.ControllerAddToCartSc
 import com.ecommerce.orders_service.sources.scenarios.cart.ControllerApplyCouponScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.ControllerGetCartAuthScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.ControllerGetCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerRemoveCartItemScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerUpdateCartItemQuantityScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.GetCartByUserIdScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.GetCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.RemoveCartItemScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.UpdateCartItemQuantityScenario;
 
 import java.util.stream.Stream;
 
 /**
  * Proveedor centralizado de escenarios de prueba para el dominio de Carrito ({@code CartController} y {@code CartService}).
  * <p>
- * Reemplaza los archivos CSV y {@code ArgumentsAggregator} manteniendo la regla <b>Zero Hardcoded Data</b>
- * fuera de las clases de prueba y garantizando seguridad de tipos en tiempo de compilación.
+ * Mantiene la regla <b>Zero Hardcoded Data</b> fuera de las clases de prueba y garantiza seguridad de tipos en tiempo de compilación.
  */
 public final class CartScenarioProvider {
 
@@ -45,13 +48,53 @@ public final class CartScenarioProvider {
                 ),
                 new ControllerAddToCartScenario(
                         "Falla al agregar producto sin stock disponible y retorna 409 Conflict",
-                        null, 1L, null, 101L, 50, null, null, 409,
+                        null, 1L, null, 101L, 5, null, null, 409,
                         ProductOutOfStockException.class, "Stock insuficiente para el producto 101"
                 ),
                 new ControllerAddToCartScenario(
                         "Falla al agregar cantidad invalida al carrito y retorna 400 Bad Request",
                         null, 1L, null, 101L, 0, null, null, 400,
                         InvalidCartOperationException.class, "La cantidad solicitada debe ser mayor a cero"
+                )
+        );
+    }
+
+    public static Stream<ControllerUpdateCartItemQuantityScenario> provideControllerUpdateCartItemQuantityScenarios() {
+        return Stream.of(
+                new ControllerUpdateCartItemQuantityScenario(
+                        "Actualiza exitosamente la cantidad del item en el carrito y retorna 200 OK",
+                        10L, 3, 1L, 5L, 101L, "50.00", "150.00", 200, null, null, null
+                ),
+                new ControllerUpdateCartItemQuantityScenario(
+                        "Falla validacion Bean Validation cuando la cantidad es menor a 1 y retorna 400 Bad Request",
+                        10L, 0, null, null, null, null, null, 400,
+                        null, "VALIDATION_ERROR", null
+                ),
+                new ControllerUpdateCartItemQuantityScenario(
+                        "Falla al actualizar cantidad cuando el item no existe y retorna 404 Not Found",
+                        999L, 2, null, null, null, null, null, 404,
+                        CartNotFoundException.class, "CART_NOT_FOUND",
+                        "No se encontró el ítem en el carrito con id: 999"
+                ),
+                new ControllerUpdateCartItemQuantityScenario(
+                        "Falla al actualizar cantidad cuando el stock es insuficiente y retorna 409 Conflict",
+                        10L, 4, null, null, null, null, null, 409,
+                        ProductOutOfStockException.class, "PRODUCT_OUT_OF_STOCK",
+                        "Stock insuficiente para el producto 101"
+                )
+        );
+    }
+
+    public static Stream<ControllerRemoveCartItemScenario> provideControllerRemoveCartItemScenarios() {
+        return Stream.of(
+                new ControllerRemoveCartItemScenario(
+                        "Elimina exitosamente el item del carrito y retorna 204 No Content",
+                        10L, 204, null, null, null
+                ),
+                new ControllerRemoveCartItemScenario(
+                        "Falla al intentar eliminar un item inexistente y retorna 404 Not Found",
+                        999L, 404, CartNotFoundException.class, "CART_NOT_FOUND",
+                        "No se encontró el ítem en el carrito con id: 999"
                 )
         );
     }
@@ -189,6 +232,59 @@ public final class CartScenarioProvider {
                         "Falla cuando el monto total del carrito supera el limite permitido",
                         10L, 1L, true, false, 0, null, null, null, 101L, 5, "2000.00", 0, "0.00",
                         BusinessOperationException.class, "El total del carrito no puede superar $500"
+                )
+        );
+    }
+
+    public static Stream<UpdateCartItemQuantityScenario> provideUpdateCartItemQuantityScenarios() {
+        return Stream.of(
+                new UpdateCartItemQuantityScenario(
+                        "Actualiza cantidad exitosamente usando precio vigente y conservando el itemId real de BD",
+                        10L, 3, true, 1L, 1L, 10L, 101L, 1, "100.00", "120.00", 10, 1, "360.00", null, null
+                ),
+                new UpdateCartItemQuantityScenario(
+                        "Falla cuando no existe ningun carrito con el itemId solicitado",
+                        999L, 2, false, null, null, null, null, null, null, null, null, 0, "0.00",
+                        CartNotFoundException.class, "No se encontró el ítem en el carrito con id: 999"
+                ),
+                new UpdateCartItemQuantityScenario(
+                        "Falla cuando el carrito devuelto no contiene el itemId en su coleccion de items",
+                        999L, 2, true, 1L, 1L, 10L, 101L, 1, "100.00", null, null, 0, "0.00",
+                        CartNotFoundException.class, "No se encontró el ítem en el carrito con id: 999"
+                ),
+                new UpdateCartItemQuantityScenario(
+                        "Falla cuando la nueva cantidad solicitada supera el maximo de 5 unidades por producto",
+                        10L, 6, true, 1L, 1L, 10L, 101L, 1, "100.00", null, null, 0, "0.00",
+                        BusinessOperationException.class, "Máximo 5 unidades por producto"
+                ),
+                new UpdateCartItemQuantityScenario(
+                        "Falla cuando el stock disponible en el catalogo es menor a la cantidad solicitada",
+                        10L, 4, true, 1L, 1L, 10L, 101L, 1, "100.00", "120.00", 2, 0, "0.00",
+                        ProductOutOfStockException.class, "Stock insuficiente para el producto 101"
+                ),
+                new UpdateCartItemQuantityScenario(
+                        "Falla cuando el nuevo total recalculado del carrito supera el tope permitido",
+                        10L, 3, true, 1L, 1L, 10L, 101L, 1, "100.00", "2000.00", 10, 0, "0.00",
+                        BusinessOperationException.class, "El total del carrito no puede superar $500"
+                )
+        );
+    }
+
+    public static Stream<RemoveCartItemScenario> provideRemoveCartItemScenarios() {
+        return Stream.of(
+                new RemoveCartItemScenario(
+                        "Elimina exitosamente el item de la coleccion del carrito y persiste los cambios",
+                        10L, true, 1L, 1L, 10L, 101L, 2, "50.00", 0, null, null
+                ),
+                new RemoveCartItemScenario(
+                        "Falla al intentar eliminar un itemId cuando no existe carrito asociado",
+                        999L, false, null, null, null, null, null, null, 0,
+                        CartNotFoundException.class, "No se encontró el ítem en el carrito con id: 999"
+                ),
+                new RemoveCartItemScenario(
+                        "Falla cuando el itemId no coincide con ningun elemento dentro de la lista del carrito",
+                        999L, true, 1L, 1L, 10L, 101L, 2, "50.00", 1,
+                        CartNotFoundException.class, "No se encontró el ítem en el carrito con id: 999"
                 )
         );
     }

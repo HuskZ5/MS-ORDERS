@@ -1,44 +1,64 @@
 package com.ecommerce.orders_service.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.util.List;
 
-public class CartResponse {
-    private Long cartId;
-    private Long userId;
-    private List<CartItemDto> items;
-    private BigDecimal subtotal;
-    private BigDecimal discountAmount;
-    private BigDecimal totalAmount;
+/**
+ * DTO inmutable (Java Record) que representa el estado detallado y los totales calculados del carrito de compras.
+ */
+@Schema(description = "Respuesta con el detalle de los productos y desglose monetario del carrito de compras")
+public record CartResponse(
+        @Schema(
+                description = "Identificador único del carrito de compras",
+                example = "10",
+                type = "integer",
+                format = "int64"
+        )
+        Long cartId,
 
+        @Schema(
+                description = "Identificador único del usuario propietario del carrito",
+                example = "1",
+                type = "integer",
+                format = "int64"
+        )
+        Long userId,
 
-    public CartResponse() {}
+        @Schema(
+                description = "Lista de líneas de productos contenidas actualmente en el carrito"
+        )
+        List<CartItemDto> items,
 
-    public CartResponse(Long cartId, Long userId, List<CartItemDto> items, BigDecimal subtotal, BigDecimal discountAmount, BigDecimal totalAmount) {
-        this.cartId = cartId;
-        this.userId = userId;
-        this.items = items;
-        this.subtotal = subtotal;
-        this.discountAmount = discountAmount;
-        this.totalAmount = totalAmount;
-    }
+        @Schema(
+                description = "Subtotal acumulado de los productos antes de aplicar descuentos (en BigDecimal)",
+                example = "300.00",
+                type = "number",
+                format = "decimal"
+        )
+        BigDecimal subtotal,
 
-    // Getters y Setters
+        @Schema(
+                description = "Monto total descontado por cupones promocionales aplicados al carrito (en BigDecimal)",
+                example = "30.00",
+                type = "number",
+                format = "decimal"
+        )
+        BigDecimal discountAmount,
+
+        @Schema(
+                description = "Monto total final a pagar tras aplicar descuentos (en BigDecimal)",
+                example = "270.00",
+                type = "number",
+                format = "decimal"
+        )
+        BigDecimal totalAmount
+) {
     public Long getCartId() { return cartId; }
-    public void setCartId(Long cartId) { this.cartId = cartId; }
-
     public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-
     public List<CartItemDto> getItems() { return items; }
-    public void setItems(List<CartItemDto> items) { this.items = items; }
-
+    public BigDecimal getSubtotal() { return subtotal; }
+    public BigDecimal getDiscountAmount() { return discountAmount; }
     public BigDecimal getTotalAmount() { return totalAmount; }
-    public void setTotalAmount(BigDecimal totalAmount) { this.totalAmount = totalAmount; }
-
-    public BigDecimal getSubtotal() {return subtotal;}
-    public void setSubtotal(BigDecimal subtotal) {this.subtotal = subtotal;}
-
-    public BigDecimal getDiscountAmount() {return discountAmount;}
-    public void setDiscountAmount(BigDecimal discountAmount) {this.discountAmount = discountAmount;}
 }

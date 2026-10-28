@@ -4,6 +4,7 @@ import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.CancelOrderRequest;
 import com.ecommerce.orders_service.dto.CancelOrderResponse;
 import com.ecommerce.orders_service.dto.OrderResponse;
+import com.ecommerce.orders_service.dto.ProductResponse;
 import com.ecommerce.orders_service.exceptions.UnauthorizedOrderAccessException;
 import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.model.Cart;
@@ -39,17 +40,6 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
-/**
- * Suite de pruebas unitarias puras para {@link OrderService}.
- * <p>
- * Implementa la arquitectura estricta <b>Zero Hardcoded Data</b>:
- * <ul>
- *   <li>Estructura jerárquica con {@link Nested} y {@link DisplayName}.</li>
- *   <li>Aserciones fluidas exclusivamente con AssertJ ({@code assertThat}).</li>
- *   <li>Uso de {@link OrderTestDataBuilder} y {@link CartTestDataBuilder}.</li>
- *   <li>Pruebas parametrizadas alimentadas desde {@code OrderScenarioProvider} mediante {@link MethodSource}.</li>
- * </ul>
- */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("OrderService - Suite de Pruebas Unitarias (Zero Hardcoded Data)")
 class OrderServiceTest {
@@ -259,7 +249,9 @@ class OrderServiceTest {
                 CartTestDataBuilder cartBuilder = CartTestDataBuilder.aCart()
                         .withUserId(scenario.userId());
                 if (!scenario.cartEmpty()) {
-                    cartBuilder.withItem(scenario.productId(), scenario.quantity(), scenario.unitPrice());
+                    cartBuilder.withItem(scenario.productId(), scenario.quantity(), scenario.cartItemPrice());
+                    ProductResponse productResponse = OrderTestDataBuilder.buildProductResponse(scenario);
+                    when(productClient.getProductById(scenario.productId())).thenReturn(productResponse);
                 }
                 Cart cart = cartBuilder.build();
                 when(cartRepository.findByUserId(scenario.userId())).thenReturn(Optional.of(cart));
@@ -290,6 +282,11 @@ class OrderServiceTest {
                 assertThat(response.getUserId()).isEqualTo(scenario.userId());
                 assertThat(response.getTotal()).isEqualByComparingTo(scenario.expectedTotal());
                 assertThat(response.getStatus()).isEqualTo(scenario.expectedStatus().name());
+                assertThat(response.getItems())
+                        .hasSize(1)
+                        .first()
+                        .satisfies(item -> assertThat(item.getUnitPrice()).isEqualByComparingTo(scenario.catalogPrice()));
+                verify(productClient).getProductById(scenario.productId());
                 verify(productClient).reduceStock(scenario.productId(), scenario.quantity());
                 verify(orderRepository).save(any(Order.class));
                 verify(cartRepository).save(any(Cart.class));
