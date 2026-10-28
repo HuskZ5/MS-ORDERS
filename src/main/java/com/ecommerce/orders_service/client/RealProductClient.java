@@ -14,6 +14,8 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.Map;
+
 /**
  * Implementación real de {@link ProductClient} activa bajo el perfil "local".
  * Realiza peticiones HTTP síncronas mediante {@link RestClient} hacia el microservicio MS-Productos,
@@ -81,12 +83,18 @@ public class RealProductClient implements ProductClient {
 
         String token = getAuthorizationToken();
 
+        Map<String, Object> requestBody = Map.of(
+                "quantity", Math.abs(quantity),
+                "movementType", "OUT",
+                "reason", "Reducción por orden de compra"
+        );
+
         try {
             restClient.patch()
                     .uri("/api/products/{id}/stock", productId)
                     .header(HttpHeaders.AUTHORIZATION, token)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .body(new ReduceStockRequest(quantity))
+                    .body(requestBody)
                     .retrieve()
                     .toBodilessEntity();
 
