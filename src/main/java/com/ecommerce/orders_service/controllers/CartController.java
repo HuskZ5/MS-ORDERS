@@ -6,6 +6,7 @@ import com.ecommerce.orders_service.exceptions.UnauthorizedUserException;
 import com.ecommerce.orders_service.service.CartService;
 import com.ecommerce.orders_service.service.CouponService;
 import com.ecommerce.orders_service.dto.ApplyCouponRequest;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -19,9 +20,16 @@ public class CartController {
     private final CouponService couponService;
 
     @PostMapping("/items")
-    public ResponseEntity<CartResponse> addProductToCart(
-            @RequestBody AddToCartRequest request) {
+    public ResponseEntity<CartResponse> addProductToCart(@RequestHeader(value = "X-USER-ID", required = false)
+                                                             Long userId,
+            @Valid @RequestBody AddToCartRequest request) {
 
+        if (userId == null) {
+            throw new UnauthorizedUserException(
+                    "Usuario no autenticado");
+        }
+
+        request.setUserId(userId);
         CartResponse response = cartService.addItemToCart(request);
 
         return ResponseEntity.ok(response);
