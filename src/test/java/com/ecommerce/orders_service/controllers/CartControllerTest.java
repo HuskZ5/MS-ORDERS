@@ -77,6 +77,7 @@ class CartControllerTest {
                 when(cartService.addItemToCart(any(AddToCartRequest.class))).thenThrow(ex);
 
                 mockMvc.perform(post("/api/carts/items")
+                                .header("X-USER-ID", 1L)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(jsonPayload))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
@@ -86,6 +87,7 @@ class CartControllerTest {
                 when(cartService.addItemToCart(any(AddToCartRequest.class))).thenReturn(response);
 
                 mockMvc.perform(post("/api/carts/items")
+                                .header("X-USER-ID", 1L)
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(jsonPayload))
                         .andExpect(status().is(scenario.expectedHttpStatus()))
