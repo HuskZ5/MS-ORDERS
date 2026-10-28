@@ -1,44 +1,65 @@
 package com.ecommerce.orders_service.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
-public class OrderResponse {
-    private Long id;
-    private Long userId;
-    private BigDecimal total;
-    private String status;
-    private LocalDateTime createdAt;
-    private List<OrderItemDto> items;
+/**
+ * DTO inmutable (Java Record) que representa una orden de compra confirmada con su desglose histórico.
+ */
+@Schema(description = "Respuesta con la información de una orden de compra generada y sus líneas históricas")
+public record OrderResponse(
+        @Schema(
+                description = "Identificador único de la orden de compra",
+                example = "100",
+                type = "integer",
+                format = "int64"
+        )
+        Long id,
 
-    public OrderResponse() {}
+        @Schema(
+                description = "Identificador único del usuario que realizó la orden",
+                example = "1",
+                type = "integer",
+                format = "int64"
+        )
+        Long userId,
 
-    public OrderResponse(Long id, Long userId, BigDecimal total, String status, LocalDateTime createdAt, List<OrderItemDto> items) {
-        this.id = id;
-        this.userId = userId;
-        this.total = total;
-        this.status = status;
-        this.createdAt = createdAt;
-        this.items = items;
-    }
+        @Schema(
+                description = "Monto total final de la orden calculado en el backend con precios vigentes (en BigDecimal)",
+                example = "270.00",
+                type = "number",
+                format = "decimal"
+        )
+        BigDecimal total,
 
-    // Getters y Setters
+        @Schema(
+                description = "Estado actual del ciclo de vida de la orden",
+                example = "CREATED",
+                type = "string",
+                allowableValues = {"CREATED", "PAID", "SHIPPED", "DELIVERED", "CANCELLED"}
+        )
+        String status,
+
+        @Schema(
+                description = "Fecha y hora de creación de la orden en formato ISO-8601",
+                example = "2026-10-27T20:15:30",
+                type = "string",
+                format = "date-time"
+        )
+        LocalDateTime createdAt,
+
+        @Schema(
+                description = "Detalle histórico de los productos comprados con su cantidad y precio unitario congelado"
+        )
+        List<OrderItemDto> items
+) {
     public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
-
     public Long getUserId() { return userId; }
-    public void setUserId(Long userId) { this.userId = userId; }
-
     public BigDecimal getTotal() { return total; }
-    public void setTotal(BigDecimal total) { this.total = total; }
-
     public String getStatus() { return status; }
-    public void setStatus(String status) { this.status = status; }
-
     public LocalDateTime getCreatedAt() { return createdAt; }
-    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
-
     public List<OrderItemDto> getItems() { return items; }
-    public void setItems(List<OrderItemDto> items) { this.items = items; }
 }

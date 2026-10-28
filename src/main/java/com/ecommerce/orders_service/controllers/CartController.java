@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,23 +21,11 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @RestController
 @RequestMapping({"/api/v1/cart", "/api/cart", "/api/carts"})
-@Tag(name = "Carrito de Compras", description = "Endpoints para la administración de ítems del carrito de compras")
 public class CartController {
 
     private final CartService cartService;
     private final CouponService couponService;
 
-    @Operation(
-            summary = "Agregar un producto al carrito",
-            description = "Agrega un producto al carrito activo del usuario o acumula su cantidad validando límites de negocio."
-    )
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Producto agregado correctamente al carrito"),
-            @ApiResponse(responseCode = "400", description = "Datos de entrada inválidos o violación de regla de negocio",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Producto no encontrado en el catálogo",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
-    })
     @PostMapping("/items")
     public ResponseEntity<CartResponse> addProductToCart(
             @Valid @RequestBody AddToCartRequest request) {
@@ -49,22 +36,43 @@ public class CartController {
     }
 
     // PATCH /api/v1/cart/items/{itemId}
-    // This endpoint updates the quantity of a specific item in the cart, ensuring that the new quantity is
-    // within allowed limits and that there is sufficient stock available.
-    // It returns the updated cart response if successful, or an error response if any validation fails.
     @Operation(
-            summary = "Actualizar la cantidad de un producto en el carrito",
-            description = "Modifica la cantidad de una línea específica del carrito validando disponibilidad de inventario, límite máximo por producto (5) y tope monetario en el backend."
+            summary = "Cambiar la cantidad de un producto en el carrito",
+            description = "Actualiza la cantidad de una línea específica del carrito de compras. Valida que el ítem exista, que la cantidad solicitada se encuentre entre 1 y 5 unidades, que exista stock suficiente en el catálogo de productos y que el nuevo subtotal del carrito no supere el límite máximo permitido ($20,000), recalculando los totales en BigDecimal."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Cantidad actualizada exitosamente y totales recalculados",
-                    content = @Content(schema = @Schema(implementation = CartResponse.class))),
-            @ApiResponse(responseCode = "400", description = "Cantidad fuera de rango permitido o límite del carrito excedido",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "404", description = "Ítem del carrito o producto no encontrado",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class))),
-            @ApiResponse(responseCode = "409", description = "Stock insuficiente para la cantidad solicitada",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Cantidad del producto actualizada exitosamente y totales del carrito recalculados",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = CartResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Cantidad inválida (fuera del rango 1 a 5) o el carrito supera el monto máximo permitido",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "El ítem especificado no existe en el carrito o el producto no fue encontrado en el catálogo",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiErrorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "Stock insuficiente en el inventario para cubrir la nueva cantidad solicitada",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiErrorResponse.class)
+                    )
+            )
     })
     @PatchMapping("/items/{itemId}")
     public ResponseEntity<CartResponse> updateCartItemQuantity(
@@ -77,17 +85,23 @@ public class CartController {
     }
 
     // DELETE /api/v1/cart/items/{itemId}
-    // This endpoint removes a specific item from the cart based on its unique identifier.
-    // It returns a 204 No Content response if the item is successfully removed,
-    // or a 404 Not Found response if the item does not exist in any active cart.
     @Operation(
             summary = "Retirar un producto del carrito",
-            description = "Elimina permanentemente una línea de producto del carrito de compras mediante su identificador único."
+            description = "Elimina de forma permanente una línea de producto del carrito activo a partir de su identificador único (itemId) y actualiza el estado persistido del carrito."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Ítem eliminado exitosamente del carrito (Sin contenido)"),
-            @ApiResponse(responseCode = "404", description = "Ítem no encontrado en ningún carrito activo",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse.class)))
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "Producto retirado exitosamente del carrito (Sin contenido en el cuerpo de respuesta)"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "El ítem solicitado no fue encontrado en ningún carrito activo",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ApiErrorResponse.class)
+                    )
+            )
     })
     @DeleteMapping("/items/{itemId}")
     public ResponseEntity<Void> removeProductFromCart(
