@@ -5,6 +5,7 @@ import com.ecommerce.orders_service.dto.ApplyCouponRequest;
 import com.ecommerce.orders_service.dto.CartItemDto;
 import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.dto.ProductResponse;
+import com.ecommerce.orders_service.dto.UpdateCartItemQuantityRequest;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.sources.scenarios.cart.AddToCartScenario;
@@ -12,6 +13,8 @@ import com.ecommerce.orders_service.sources.scenarios.cart.ControllerAddToCartSc
 import com.ecommerce.orders_service.sources.scenarios.cart.ControllerApplyCouponScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.ControllerGetCartAuthScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.ControllerGetCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.ControllerUpdateCartItemQuantityScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.UpdateCartItemQuantityScenario;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -53,9 +56,13 @@ public class CartTestDataBuilder {
     }
 
     public CartTestDataBuilder withItem(Long productId, Integer quantity, String price) {
+        return withItem((long) (this.items.size() + 1), productId, quantity, price);
+    }
+
+    public CartTestDataBuilder withItem(Long itemId, Long productId, Integer quantity, String price) {
         if (price != null && !price.isBlank()) {
             CartItem item = new CartItem();
-            item.setId((long) (this.items.size() + 1));
+            item.setId(itemId);
             item.setProductId(productId);
             item.setQuantity(quantity);
             item.setPrice(new BigDecimal(price));
@@ -96,19 +103,29 @@ public class CartTestDataBuilder {
     }
 
     public static AddToCartRequest buildAddToCartRequest(ControllerAddToCartScenario scenario) {
-        AddToCartRequest request = new AddToCartRequest();
-        request.setUserId(scenario.userId());
-        request.setProductId(scenario.productId());
-        request.setQuantity(scenario.quantity());
-        return request;
+        return new AddToCartRequest(
+                scenario.userId(),
+                scenario.productId(),
+                scenario.quantity()
+        );
     }
 
     public static AddToCartRequest buildAddToCartRequest(AddToCartScenario scenario) {
-        AddToCartRequest request = new AddToCartRequest();
-        request.setUserId(scenario.userId());
-        request.setProductId(scenario.requestProductId());
-        request.setQuantity(scenario.requestQuantity());
-        return request;
+        return new AddToCartRequest(
+                scenario.userId(),
+                scenario.requestProductId(),
+                scenario.requestQuantity()
+        );
+    }
+
+    public static UpdateCartItemQuantityRequest buildUpdateCartItemQuantityRequest(
+            ControllerUpdateCartItemQuantityScenario scenario) {
+        return new UpdateCartItemQuantityRequest(scenario.requestQuantity());
+    }
+
+    public static UpdateCartItemQuantityRequest buildUpdateCartItemQuantityRequest(
+            UpdateCartItemQuantityScenario scenario) {
+        return new UpdateCartItemQuantityRequest(scenario.requestQuantity());
     }
 
     public static ApplyCouponRequest buildApplyCouponRequest(ControllerApplyCouponScenario scenario) {
@@ -121,11 +138,36 @@ public class CartTestDataBuilder {
         return response;
     }
 
+    public static ProductResponse buildProductResponse(UpdateCartItemQuantityScenario scenario) {
+        ProductResponse response = new ProductResponse();
+        response.setPrice(new BigDecimal(scenario.catalogPrice()));
+        response.setStock(scenario.catalogStock());
+        return response;
+    }
+
     public static CartResponse buildCartResponse(ControllerAddToCartScenario scenario) {
         CartItemDto itemDto = new CartItemDto(
                 scenario.itemId(),
                 scenario.productId(),
                 scenario.quantity(),
+                new BigDecimal(scenario.price())
+        );
+        BigDecimal total = new BigDecimal(scenario.totalAmount());
+        return new CartResponse(
+                scenario.cartId(),
+                scenario.userId(),
+                List.of(itemDto),
+                total,
+                BigDecimal.ZERO,
+                total
+        );
+    }
+
+    public static CartResponse buildCartResponse(ControllerUpdateCartItemQuantityScenario scenario) {
+        CartItemDto itemDto = new CartItemDto(
+                scenario.itemId(),
+                scenario.productId(),
+                scenario.requestQuantity(),
                 new BigDecimal(scenario.price())
         );
         BigDecimal total = new BigDecimal(scenario.totalAmount());

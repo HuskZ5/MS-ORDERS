@@ -1,14 +1,16 @@
 package com.ecommerce.orders_service.client;
 
 import com.ecommerce.orders_service.dto.ProductResponse;
-import com.ecommerce.orders_service.exceptions.ProductNotFoundException;
 import com.ecommerce.orders_service.dto.ReduceStockRequest;
+import com.ecommerce.orders_service.exceptions.ProductNotFoundException;
 import com.ecommerce.orders_service.exceptions.ProductOutOfStockException;
-import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 import org.springframework.http.MediaType;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClient;
+
+import java.math.BigDecimal;
 
 @Component
 public class ProductClient {
@@ -24,6 +26,29 @@ public class ProductClient {
     }
 
     public ProductResponse getProductById(Long productId) {
+
+        // ===================== MOCK LOCAL (Descomentar para pruebas sin MS-Productos) =====================
+        if (productId == null || productId == 999L) {
+            throw new ProductNotFoundException("Producto no encontrado con id: " + productId);
+        }
+        if (productId == 888L) {
+            return new ProductResponse(
+                    "Producto Sin Stock #" + productId,
+                    "Producto de prueba con stock agotado",
+                    new BigDecimal("100.00"),
+                    0
+            );
+        }
+        return new ProductResponse(
+                "Producto Simulado #" + productId,
+                "Descripción simulada localmente para pruebas",
+                new BigDecimal("100.00"),
+                20
+        );
+        // ==================================================================================================
+
+        /*
+        // ===================== PRODUCCIÓN (Llamada real con RestClient) ===================================
         try {
             return restClient.get()
                     .uri("/api/products/{id}", productId)
@@ -35,6 +60,8 @@ public class ProductClient {
                     "Producto no encontrado con id: " + productId
             );
         }
+        // ==================================================================================================
+        */
     }
 
 
@@ -52,6 +79,17 @@ public class ProductClient {
             );
         }
 
+        // ===================== MOCK LOCAL (Descomentar para pruebas sin MS-Productos) =====================
+        if (productId == 888L || quantity > 20) {
+            throw new ProductOutOfStockException(
+                    "Stock insuficiente para el producto " + productId
+            );
+        }
+        System.out.println("[MOCK LOCAL] Stock reducido -> productId=" + productId + ", quantity=" + quantity);
+        // ==================================================================================================
+
+        /*
+        // ===================== PRODUCCIÓN (Llamada real con RestClient) ===================================
         try {
             restClient.patch()
                     .uri("/api/products/{id}/stock", productId)
@@ -67,6 +105,8 @@ public class ProductClient {
                     "Stock insuficiente para el producto " + productId
             );
         }
+        // ==================================================================================================
+        */
     }
 
 
@@ -84,13 +124,20 @@ public class ProductClient {
             );
         }
 
+        // ===================== MOCK LOCAL (Descomentar para pruebas sin MS-Productos) =====================
+        System.out.println("[MOCK LOCAL] Stock restaurado -> productId=" + productId + ", quantity=" + quantity);
+        // ==================================================================================================
+
+        /*
+        // ===================== PRODUCCIÓN (Llamada real con RestClient) ===================================
         restClient.patch()
                 .uri("/api/products/{id}/stock/restore", productId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(new ReduceStockRequest(quantity))
                 .retrieve()
                 .toBodilessEntity();
+        // ==================================================================================================
+        */
     }
-
 
 }

@@ -186,24 +186,31 @@ public final class OrderScenarioProvider {
     public static Stream<CreateOrderScenario> provideCreateOrderScenarios() {
         return Stream.of(
                 new CreateOrderScenario(
-                        "Creacion exitosa de orden desde carrito reduce stock y calcula total",
-                        5L, true, false, 101L, 3, "100.00", "300.00", OrderStatus.CREATED, null, null, null
+                        "Creacion exitosa de orden congela precio vigente del catalogo y reduce stock",
+                        5L, true, false, 101L, 3, "80.00", "100.00", 20, "300.00", OrderStatus.CREATED, null, null, null
                 ),
                 new CreateOrderScenario(
-                        "Falla creacion de orden cuando stock es insuficiente",
-                        5L, true, false, 101L, 5, "100.00", "0.00", null,
+                        "Falla creacion de orden antes de reducir stock cuando stock en catalogo es menor a la cantidad",
+                        5L, true, false, 101L, 4, "50.00", "80.00", 2, "0.00", null,
+                        null,
+                        ProductOutOfStockException.class,
+                        "Stock insuficiente para el producto 101"
+                ),
+                new CreateOrderScenario(
+                        "Falla creacion de orden cuando reduceStock lanza conflicto de inventario",
+                        5L, true, false, 101L, 5, "100.00", "100.00", 10, "0.00", null,
                         ProductOutOfStockException.class,
                         ProductOutOfStockException.class,
                         "Stock insuficiente para el producto 101"
                 ),
                 new CreateOrderScenario(
                         "Falla creacion de orden cuando carrito no existe",
-                        99L, false, true, 0L, 0, "0.00", "0.00", null,
+                        99L, false, true, 0L, 0, "0.00", "0.00", 0, "0.00", null,
                         null, CartNotFoundException.class, "Carrito no encontrado para el usuario id: 99"
                 ),
                 new CreateOrderScenario(
                         "Falla creacion de orden cuando carrito esta vacio",
-                        5L, true, true, 0L, 0, "0.00", "0.00", null,
+                        5L, true, true, 0L, 0, "0.00", "0.00", 0, "0.00", null,
                         null, CartEmptyException.class, "El carrito del usuario 5 está vacío"
                 )
         );

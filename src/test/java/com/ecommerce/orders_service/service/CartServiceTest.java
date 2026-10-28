@@ -4,6 +4,7 @@ import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.AddToCartRequest;
 import com.ecommerce.orders_service.dto.CartResponse;
 import com.ecommerce.orders_service.dto.ProductResponse;
+import com.ecommerce.orders_service.dto.UpdateCartItemQuantityRequest;
 import com.ecommerce.orders_service.exceptions.ProductNotFoundException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.repository.CartRepository;
@@ -11,6 +12,8 @@ import com.ecommerce.orders_service.sources.builders.CartTestDataBuilder;
 import com.ecommerce.orders_service.sources.scenarios.cart.AddToCartScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.GetCartByUserIdScenario;
 import com.ecommerce.orders_service.sources.scenarios.cart.GetCartScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.RemoveCartItemScenario;
+import com.ecommerce.orders_service.sources.scenarios.cart.UpdateCartItemQuantityScenario;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -160,6 +163,104 @@ class CartServiceTest {
                     verify(cartRepository).findByUserId(scenario.userId());
                     verify(cartRepository).save(any(Cart.class));
                 }
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Actualizar Cantidad de Ítem en Carrito (updateItemQuantity)")
+    class UpdateItemQuantityTests {
+
+        @ParameterizedTest(name = "{index} - {0}")
+        @MethodSource("com.ecommerce.orders_service.sources.providers.CartScenarioProvider#provideUpdateCartItemQuantityScenarios")
+        @DisplayName("Escenarios de actualización de cantidad de ítem en carrito")
+        void shouldHandleUpdateItemQuantityScenarios(UpdateCartItemQuantityScenario scenario) {
+
+            UpdateCartItemQuantityRequest request = CartTestDataBuilder.buildUpdateCartItemQuantityRequest(scenario);
+
+            if (!scenario.cartFoundByItemId()) {
+                when(cartRepository.findByItems_Id(scenario.targetItemId())).thenReturn(Optional.empty());
+            } else {
+                Cart existingCart = CartTestDataBuilder.aCart()
+                        .withId(scenario.cartId())
+                        .withUserId(scenario.userId())
+                        .withItem(
+                                scenario.existingItemId(),
+                                scenario.productId(),
+                                scenario.existingQuantity(),
+                                scenario.existingPrice()
+                        )
+                        .build();
+                when(cartRepository.findByItems_Id(scenario.targetItemId())).thenReturn(Optional.of(existingCart));
+
+                if (scenario.catalogPrice() != null) {
+                    ProductResponse productResponse = CartTestDataBuilder.buildProductResponse(scenario);
+                    when(productClient.getProductById(scenario.productId())).thenReturn(productResponse);
+                }
+            }
+
+            if (scenario.expectedException() != null) {
+                assertThatThrownBy(() -> cartService.updateItemQuantity(scenario.targetItemId(), request))
+                        .isInstanceOf(scenario.expectedException())
+                        .hasMessage(scenario.expectedErrorMessage());
+
+                verify(cartRepository, never()).save(any(Cart.class));
+            } else {
+                when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
+
+                CartResponse response = cartService.updateItemQuantity(scenario.targetItemId(), request);
+
+                assertThat(response).isNotNull();
+                assertThat(response.getItems()).hasSize(scenario.expectedItemsCount());
+                assertThat(response.getItems().get(0).getItemId()).isEqualTo(scenario.existingItemId());
+                assertThat(response.getItems().get(0).getQuantity()).isEqualTo(scenario.requestQuantity());
+                assertThat(response.getTotalAmount()).isEqualByComparingTo(scenario.expectedTotalAmount());
+
+                verify(cartRepository).save(any(Cart.class));
+            }
+        }
+    }
+
+    @Nested
+    @DisplayName("Eliminar Producto del Carrito (removeItemFromCart)")
+    class RemoveItemFromCartTests {
+
+        @ParameterizedTest(name = "{index} - {0}")
+        @MethodSource("com.ecommerce.orders_service.sources.providers.CartScenarioProvider#provideRemoveCartItemScenarios")
+        @DisplayName("Escenarios de eliminación de ítem del carrito")
+        void shouldHandleRemoveItemFromCartScenarios(RemoveCartItemScenario scenario) {
+
+            Cart existingCart = null;
+
+            if (!scenario.cartFoundByItemId()) {
+                when(cartRepository.findByItems_Id(scenario.targetItemId())).thenReturn(Optional.empty());
+            } else {
+                existingCart = CartTestDataBuilder.aCart()
+                        .withId(scenario.cartId())
+                        .withUserId(scenario.userId())
+                        .withItem(
+                                scenario.existingItemId(),
+                                scenario.productId(),
+                                scenario.existingQuantity(),
+                                scenario.existingPrice()
+                        )
+                        .build();
+                when(cartRepository.findByItems_Id(scenario.targetItemId())).thenReturn(Optional.of(existingCart));
+            }
+
+            if (scenario.expectedException() != null) {
+                assertThatThrownBy(() -> cartService.removeItemFromCart(scenario.targetItemId()))
+                        .isInstanceOf(scenario.expectedException())
+                        .hasMessage(scenario.expectedErrorMessage());
+
+                verify(cartRepository, never()).save(any(Cart.class));
+            } else {
+                when(cartRepository.save(any(Cart.class))).thenAnswer(inv -> inv.getArgument(0));
+
+                cartService.removeItemFromCart(scenario.targetItemId());
+
+                assertThat(existingCart.getItems()).hasSize(scenario.expectedRemainingItemsCount());
+                verify(cartRepository).save(existingCart);
             }
         }
     }

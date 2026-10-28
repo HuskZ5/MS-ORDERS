@@ -1,20 +1,36 @@
 package com.ecommerce.orders_service.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
-//import java.math.BigDecimal;
-@AllArgsConstructor
-@NoArgsConstructor
-@Getter
-@Setter
-public class AddToCartRequest {
-    private Long userId;
-    private Long productId;
-    private Integer quantity;
-    //private BigDecimal price;
+/**
+ * DTO inmutable (Java Record) para la solicitud de agregar un producto al carrito.
+ */
+public record AddToCartRequest(
+        @NotNull(message = "El ID del usuario es obligatorio")
+        @Positive(message = "El ID del usuario debe ser un número positivo")
+        Long userId,
 
-    // Getters y Setters
+        @NotNull(message = "El ID del producto es obligatorio")
+        @Positive(message = "El ID del producto debe ser un número positivo")
+        Long productId,
+
+        @NotNull(message = "La cantidad es obligatoria")
+        @Positive(message = "La cantidad solicitada debe ser mayor a cero")
+        @Max(value = 5, message = "Máximo 5 unidades por producto")
+        Integer quantity
+) {
+    public Long getUserId() {
+        return userId;
+    }
+
+    public Long getProductId() {
+        return productId;
+    }
+
+    public Integer getQuantity() {
+        return quantity;
+    }
 }

@@ -1,15 +1,17 @@
 package com.ecommerce.orders_service.service;
 
+import com.ecommerce.orders_service.client.ProductClient;
 import com.ecommerce.orders_service.dto.AddToCartRequest;
 import com.ecommerce.orders_service.dto.CartItemDto;
 import com.ecommerce.orders_service.dto.CartResponse;
+import com.ecommerce.orders_service.dto.ProductResponse;
+import com.ecommerce.orders_service.dto.UpdateCartItemQuantityRequest;
 import com.ecommerce.orders_service.exceptions.BusinessOperationException;
 import com.ecommerce.orders_service.exceptions.CartNotFoundException;
+import com.ecommerce.orders_service.exceptions.ProductOutOfStockException;
 import com.ecommerce.orders_service.model.Cart;
 import com.ecommerce.orders_service.model.CartItem;
 import com.ecommerce.orders_service.repository.CartRepository;
-import com.ecommerce.orders_service.client.ProductClient;
-import com.ecommerce.orders_service.dto.ProductResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,7 +21,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class CartService {
@@ -56,36 +57,20 @@ public class CartService {
 
     /**
      * Agrega un ítem al carrito de compras de un usuario según los datos especificados en la solicitud.
-     * <p>
-     * <b>Regla de negocio implementada:</b>
-     * <ul>
-     *   <li>Verifica la existencia del carrito activo del usuario; en caso de no existir, se instancia uno nuevo.</li>
-     *   <li>Inspecciona iterativamente los elementos actuales del carrito ({@code cart.getItems()}) utilizando
-     *       la Stream API para validar si el {@code productId} solicitado ya se encuentra registrado.</li>
-     *   <li><b>Si el producto ya existe:</b> No se crea un nuevo registro. En su lugar, se actualiza la entidad
-     *       existente sumando la nueva cantidad a la cantidad acumulada previa (evitando inserciones duplicadas
-     *       y conflictos de restricciones únicas en base de datos) y se actualiza el precio unitario vigente.</li>
-     *   <li><b>Si el producto no existe:</b> Se instancia un nuevo {@link CartItem}, asociándole el carrito,
-     *       el identificador del producto, la cantidad y el precio, y se añade a la colección de ítems.</li>
-     * </ul>
-     * Finalmente, actualiza la fecha de modificación del carrito, persiste los cambios y retorna la representación
-     * mapeada en {@link CartResponse}.
      *
-     * @param request DTO {@link AddToCartRequest} con los datos del ítem a agregar, incluyendo el ID del usuario,
-     *                ID del producto, cantidad solicitada y precio unitario.
-     * @return {@link CartResponse} que contiene la información actualizada del carrito, lista de ítems y monto total calculado.
-     * @throws IllegalArgumentException si los datos requeridos en la solicitud son inválidos o nulos.
+     * @param request DTO {@link AddToCartRequest} con los datos del ítem a agregar.
+     * @return {@link CartResponse} que contiene la información actualizada del carrito.
      */
     @Transactional
     public CartResponse addItemToCart(AddToCartRequest request) {
         ProductResponse product =
-                productClient.getProductById(request.getProductId());
+                productClient.getProductById(request.productId());
         BigDecimal productPrice = product.getPrice();
 
-        Cart cart = cartRepository.findByUserId(request.getUserId())
+        Cart cart = cartRepository.findByUserId(request.userId())
                 .orElseGet(() -> {
                     Cart newCart = new Cart();
-                    newCart.setUserId(request.getUserId());
+                    newCart.setUserId(request.userId());
                     newCart.setItems(new ArrayList<>());
                     newCart.setCreatedDate(LocalDateTime.now());
                     return newCart;
@@ -97,13 +82,13 @@ public class CartService {
 
         // Buscar si el producto ya existe en el carrito
         Optional<CartItem> existingItemOpt = cart.getItems().stream()
-                .filter(item -> item.getProductId() != null && item.getProductId().equals(request.getProductId()))
+                .filter(item -> item.getProductId() != null && item.getProductId().equals(request.productId()))
                 .findFirst();
 
         if (existingItemOpt.isPresent()) {
             CartItem existingItem = existingItemOpt.get();
             int currentQty = existingItem.getQuantity() != null ? existingItem.getQuantity() : 0;
-            int addedQty = request.getQuantity() != null ? request.getQuantity() : 0;
+            int addedQty = request.quantity() != null ? request.quantity() : 0;
             int newQty = currentQty + addedQty;
             if (newQty > 5) throw new BusinessOperationException("Máximo 5 unidades por producto");
             existingItem.setQuantity(currentQty + addedQty);
@@ -114,11 +99,11 @@ public class CartService {
             }
             CartItem newItem = new CartItem();
             newItem.setCart(cart);
-            newItem.setProductId(request.getProductId());
-            if (request.getQuantity() > 5) {
+            newItem.setProductId(request.productId());
+            if (request.quantity() > 5) {
                 throw new BusinessOperationException("Máximo 5 unidades por producto");
             }
-            newItem.setQuantity(request.getQuantity());
+            newItem.setQuantity(request.quantity());
             newItem.setPrice(productPrice);
             cart.getItems().add(newItem);
         }
@@ -138,6 +123,69 @@ public class CartService {
         return mapToCartResponse(savedCart);
     }
 
+    
+
+    /**
+     * Actualiza la cantidad de un ítem existente en el carrito (PATCH /api/v1/cart/items/{itemId}).
+     *
+     * @param itemId  Identificador único del ítem en la tabla cart_items.
+     * @param request Record {@link UpdateCartItemQuantityRequest} con la nueva cantidad solicitada.
+     * @return {@link CartResponse} con el carrito recalculado en el backend.
+     */
+    @Transactional
+    public CartResponse updateItemQuantity(Long itemId, UpdateCartItemQuantityRequest request) {
+        Cart cart = cartRepository.findByItems_Id(itemId)
+                .orElseThrow(() -> new CartNotFoundException("No se encontró el ítem en el carrito con id: " + itemId));
+
+        CartItem targetItem = cart.getItems().stream()
+                .filter(item -> itemId.equals(item.getId()))
+                .findFirst()
+                .orElseThrow(() -> new CartNotFoundException("No se encontró el ítem en el carrito con id: " + itemId));
+
+        if (request.quantity() > 5) {
+            throw new BusinessOperationException("Máximo 5 unidades por producto");
+        }
+
+        ProductResponse product = productClient.getProductById(targetItem.getProductId());
+        if (product.getStock() != null && product.getStock() < request.quantity()) {
+            throw new ProductOutOfStockException("Stock insuficiente para el producto " + targetItem.getProductId());
+        }
+
+        targetItem.setQuantity(request.quantity());
+        targetItem.setPrice(product.getPrice());
+
+        BigDecimal newTotal = cart.getItems().stream()
+                .map(i -> i.getPrice().multiply(BigDecimal.valueOf(i.getQuantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (newTotal.compareTo(new BigDecimal("5000")) > 0) {
+            throw new BusinessOperationException("El total del carrito no puede superar $500");
+        }
+
+        cart.setUpdatedDate(LocalDateTime.now());
+        Cart savedCart = cartRepository.save(cart);
+
+        return mapToCartResponse(savedCart);
+    }
+
+    /**
+     * Retira un producto del carrito eliminando su línea correspondiente (DELETE /api/v1/cart/items/{itemId}).
+     *
+     * @param itemId Identificador único del ítem en la tabla cart_items.
+     */
+    @Transactional
+    public void removeItemFromCart(Long itemId) {
+        Cart cart = cartRepository.findByItems_Id(itemId)
+                .orElseThrow(() -> new CartNotFoundException("No se encontró el ítem en el carrito con id: " + itemId));
+
+        boolean removed = cart.getItems().removeIf(item -> itemId.equals(item.getId()));
+        if (!removed) {
+            throw new CartNotFoundException("No se encontró el ítem en el carrito con id: " + itemId);
+        }
+
+        cart.setUpdatedDate(LocalDateTime.now());
+        cartRepository.save(cart);
+    }
 
     /**
      * Devuelve el carrito de compras correspondiente a un usuario autenticado.
@@ -156,20 +204,16 @@ public class CartService {
 
     /**
      * Convierte la entidad {@link Cart} a su correspondiente DTO de transferencia {@link CartResponse}.
-     * <p>
-     * Transforma la lista de entidades {@link CartItem} a {@link CartItemDto} calculando de manera acumulativa
-     * el monto total del carrito a partir del subtotal de cada ítem (cantidad &times; precio unitario).
+     * Mapea el {@code item.getId()} real persistido en base de datos y calcula subtotales y totales con {@link BigDecimal}.
      *
      * @param cart Entidad de dominio {@link Cart} a transformar.
      * @return Instancia de {@link CartResponse} con los datos estructurados para la respuesta de la API.
      */
     public CartResponse mapToCartResponse(Cart cart) {
-        AtomicLong counter = new AtomicLong(1);
         List<CartItemDto> itemDtos = cart.getItems() != null ?
                 cart.getItems().stream()
                         .map(item -> new CartItemDto(
-                                counter.getAndIncrement(),
-                                /*item.getId(),*/
+                                item.getId(),
                                 item.getProductId(),
                                 item.getQuantity(),
                                 item.getPrice()
